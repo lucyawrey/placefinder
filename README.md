@@ -1,9 +1,9 @@
 # Placefinder
 
-[what Placefinder is]
+An experimental new type of web browser for 3D experiences.
 
 ## License
 
-All rights reserved: the source is public to read, but it isn't licensed for use, copying or distribution. See [LICENSE](LICENSE). [Note on the plan to open source it later, if any.]
+All rights reserved. The source is public, but is not licensed for copying or distribution. See [LICENSE](LICENSE). We do plan to open-source the project at a later date.
 
-Contributions from outside the project's organization aren't accepted.
+Contributions are currently not accepted.

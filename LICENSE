@@ -1,14 +1,9 @@
 Copyright (c) 2026 Lucy Awrey. All rights reserved.
 
-This repository is public so that its source code can be read. No license is
-granted to use, copy, modify, merge, publish, distribute, sublicense or sell
-this software or its source code, in whole or in part, beyond what GitHub's
-Terms of Service allow for viewing and forking public repositories on GitHub.
+This repository is public so that its source code can be read. No license is granted to use, copy, modify, merge, publish, distribute, sublicense or sell this software or its source code, in whole or in part, beyond what GitHub's Terms of Service allow for viewing and forking public repositories on GitHub.
 
-You may download the official builds published in this repository's releases
-and run them for personal, non-commercial use. This does not permit
-redistributing, modifying or reverse engineering them.
+You may download the official builds published in this repository's releases or build it yourself from source.You may run these builds for personal, non-commercial use. This does not permit redistributing, copying, or modifying them.
 
-Contributions from outside the project's organization are not accepted.
+Contributions are currently not accepted.
 
 Third-party dependencies are covered by their own licenses.
