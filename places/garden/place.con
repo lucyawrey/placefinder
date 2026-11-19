@@ -1,0 +1,5 @@
+version = 0
+name = "Garden"
+scene = "scene.gltf"
+spawn = (0.0, 0.0, 4.0)
+portals = [(target = "../meadow", center = (0.0, 1.0, -6.0), size = (1.5, 2.0, 0.3))]
