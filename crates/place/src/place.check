@@ -1,0 +1,11 @@
+namespace place
+
+class Portal(target: String, center: (Float, Float, Float), size: (Float, Float, Float))
+
+class Place {
+  let version: Int
+  let name: String
+  let scene: String
+  let spawn: (Float, Float, Float)
+  let portals: Portal[] = []
+}

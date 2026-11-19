@@ -1,0 +1,12 @@
+[package]
+name = "place"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+check-core = { git = "https://github.com/lucyawrey/check", rev = "ddda41d" }
+check-serde = { git = "https://github.com/lucyawrey/check", rev = "ddda41d" }
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+ureq = "3"

@@ -2,6 +2,35 @@
 
 An experimental new type of web browser for 3D experiences.
 
+## Build
+
+```
+cargo build
+```
+
+## Run
+
+Open a Place from a folder directly:
+
+```
+cargo run -p client -- places/garden
+```
+
+Serve a folder of Places on a small HTTP server, then open one over HTTP:
+
+```
+cargo run -p server -- places 8080
+cargo run -p client -- place://localhost:8080/garden
+```
+
+In the client, click the scene to look around, move with WASD, and press Esc to release the mouse. Type an address in the bar at the top to go there.
+
+## Tests
+
+```
+cargo test --workspace
+```
+
 ## License
 
 All rights reserved. The source is public, but is not licensed for copying or distribution. See [LICENSE](LICENSE). The project is planned to be open-sourced at a later date.
