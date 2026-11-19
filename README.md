@@ -29,6 +29,15 @@ cargo run -p client -- place://localhost:8080/garden
 
 In the client, click the scene to look around, move with WASD, and press Esc to release the mouse. Type an address in the bar at the top to go there.
 
+### Developer MCP
+
+`--mcp` serves an MCP server on `127.0.0.1` (port 7414, or the one given after `--mcp`) with tools to load a Place, read the client's logs, inspect the current Place and take a screenshot:
+
+```
+cargo run -p client -- --mcp places/garden
+claude mcp add --transport http placefinder http://127.0.0.1:7414/mcp
+```
+
 ## Tests
 
 ```

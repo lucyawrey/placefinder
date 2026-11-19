@@ -48,6 +48,7 @@ pub struct Status {
 
 pub struct Current {
     pub address: Address,
+    pub manifest: Manifest,
     number: u32,
     pub root: Entity,
 }
@@ -187,6 +188,7 @@ fn finish_travel(
             .id();
         status.current = Some(Current {
             address: place.address.clone(),
+            manifest: place.manifest.clone(),
             number: place.number,
             root,
         });
@@ -206,7 +208,7 @@ fn fail(status: &mut Status, reason: String) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
@@ -218,7 +220,12 @@ mod tests {
     use super::*;
 
     /// The client's Place loading with no window or GPU.
-    fn app() -> App {
+    pub(crate) fn app() -> App {
+        app_with(|_| {})
+    }
+
+    /// Like `app`, running `setup` before the app finishes building.
+    pub(crate) fn app_with(setup: impl FnOnce(&mut App)) -> App {
         let mut app = App::new();
         crate::source::register(&mut app);
         app.add_plugins(
@@ -239,12 +246,13 @@ mod tests {
                 .disable::<bevy::log::LogPlugin>(),
         )
         .add_plugins(PlacesPlugin);
+        setup(&mut app);
         app.finish();
         app.cleanup();
         app
     }
 
-    fn example(name: &str) -> String {
+    pub(crate) fn example(name: &str) -> String {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../places");
         dir.join(name).display().to_string()
     }
@@ -261,7 +269,7 @@ mod tests {
     }
 
     /// Travels to `target` and runs the app until the load finishes.
-    fn travel(app: &mut App, target: &str) {
+    pub(crate) fn travel(app: &mut App, target: &str) {
         app.world_mut().write_message(Travel {
             target: target.into(),
             from_portal: false,
@@ -279,7 +287,7 @@ mod tests {
         }
     }
 
-    fn current(app: &App) -> String {
+    pub(crate) fn current(app: &App) -> String {
         let status = app.world().resource::<Status>();
         status.current.as_ref().unwrap().address.to_string()
     }
