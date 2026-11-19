@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-check-core = { git = "https://github.com/lucyawrey/check", rev = "ddda41d" }
-check-serde = { git = "https://github.com/lucyawrey/check", rev = "ddda41d" }
+check-core = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
+check-serde = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
 serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

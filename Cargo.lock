@@ -2221,7 +2221,7 @@ checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 [[package]]
 name = "check-core"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=ddda41d#ddda41d1186b72a26853e7b8ded0e20b8887ec10"
+source = "git+https://github.com/lucyawrey/check?rev=7af8fb8#7af8fb84ad6776a43e88e749e5ec5c8a55c13339"
 dependencies = [
  "check-syntax",
 ]
@@ -2229,7 +2229,7 @@ dependencies = [
 [[package]]
 name = "check-serde"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=ddda41d#ddda41d1186b72a26853e7b8ded0e20b8887ec10"
+source = "git+https://github.com/lucyawrey/check?rev=7af8fb8#7af8fb84ad6776a43e88e749e5ec5c8a55c13339"
 dependencies = [
  "check-core",
  "check-syntax",
@@ -2239,7 +2239,7 @@ dependencies = [
 [[package]]
 name = "check-syntax"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=ddda41d#ddda41d1186b72a26853e7b8ded0e20b8887ec10"
+source = "git+https://github.com/lucyawrey/check?rev=7af8fb8#7af8fb84ad6776a43e88e749e5ec5c8a55c13339"
 
 [[package]]
 name = "client"
