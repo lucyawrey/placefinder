@@ -220,3 +220,123 @@ fn normalize_path(path: &Path) -> PathBuf {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(s: &str) -> Address {
+        Address::parse(s).unwrap()
+    }
+
+    #[test]
+    fn maps_to_https_except_on_localhost() {
+        assert_eq!(
+            parse("place://localhost:8080/garden").base(),
+            Base::Http("http://localhost:8080/garden/".into())
+        );
+        assert_eq!(
+            parse("place://example.com").base(),
+            Base::Http("https://example.com:443/".into())
+        );
+    }
+
+    #[test]
+    fn reads_ipv6_hosts_and_ignores_host_case() {
+        assert_eq!(
+            parse("place://[::1]/garden").base(),
+            Base::Http("http://[::1]:80/garden/".into())
+        );
+        assert_eq!(
+            parse("place://[::1]:8080/garden").base(),
+            Base::Http("http://[::1]:8080/garden/".into())
+        );
+        assert_eq!(
+            parse("place://LOCALHOST:8080/garden").base(),
+            Base::Http("http://localhost:8080/garden/".into())
+        );
+    }
+
+    #[test]
+    fn ignores_a_trailing_slash() {
+        assert_eq!(
+            parse("place://a.com/garden/"),
+            parse("place://a.com/garden")
+        );
+    }
+
+    #[test]
+    fn keeps_the_fragment_for_display_only() {
+        let address = parse("place://a.com/garden#lobby");
+        assert_eq!(address.to_string(), "place://a.com/garden#lobby");
+        assert_eq!(address.base(), parse("place://a.com/garden").base());
+    }
+
+    #[test]
+    fn refuses_bad_addresses() {
+        assert_eq!(Address::parse("  "), Err(AddressError::Empty));
+        assert_eq!(
+            Address::parse("place:///garden"),
+            Err(AddressError::MissingHost)
+        );
+        assert_eq!(
+            Address::parse("place://a.com:x"),
+            Err(AddressError::BadPort("x".into()))
+        );
+        assert_eq!(
+            Address::parse("place://a.com/../x"),
+            Err(AddressError::AboveRoot)
+        );
+    }
+
+    #[test]
+    fn resolves_relative_targets_from_served_places_and_folders() {
+        let from = parse("place://a.com:8080/places/garden");
+        assert_eq!(
+            from.resolve("../meadow").unwrap(),
+            parse("place://a.com:8080/places/meadow")
+        );
+        assert_eq!(
+            from.resolve("pond").unwrap(),
+            parse("place://a.com:8080/places/garden/pond")
+        );
+        let folder = Address::Folder(PathBuf::from("/home/x/places/garden"));
+        assert_eq!(
+            folder.resolve("../meadow").unwrap(),
+            Address::Folder(PathBuf::from("/home/x/places/meadow"))
+        );
+    }
+
+    #[test]
+    fn a_named_manifest_loads_from_its_folder() {
+        let lobby = parse("place://a.com/garden/lobby.con");
+        assert_eq!(lobby.manifest(), "lobby.con");
+        assert_eq!(lobby.base(), Base::Http("https://a.com:443/garden/".into()));
+        assert_eq!(
+            lobby.resolve("pond").unwrap(),
+            parse("place://a.com/garden/pond")
+        );
+        let folder = Address::Folder(PathBuf::from("/x/garden/lobby.con"));
+        assert_eq!(folder.manifest(), "lobby.con");
+        assert_eq!(folder.base(), Base::Folder(PathBuf::from("/x/garden")));
+        assert_eq!(
+            folder.resolve("pond").unwrap(),
+            Address::Folder(PathBuf::from("/x/garden/pond"))
+        );
+        assert_eq!(parse("place://a.com/garden").manifest(), "place.con");
+    }
+
+    #[test]
+    fn absolute_targets_ignore_the_current_place() {
+        let from = parse("place://a.com/garden");
+        assert_eq!(
+            from.resolve("place://b.com/x").unwrap(),
+            parse("place://b.com/x")
+        );
+        let absolute = std::env::temp_dir().join("x");
+        assert_eq!(
+            from.resolve(absolute.to_str().unwrap()).unwrap(),
+            Address::Folder(absolute)
+        );
+    }
+}

@@ -204,3 +204,110 @@ fn fail(status: &mut Status, reason: String) {
     status.loading = None;
     status.error = Some(reason);
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+    use std::time::{Duration, Instant};
+
+    use bevy::asset::AssetMetaCheck;
+    use bevy::render::RenderPlugin;
+    use bevy::render::settings::WgpuSettings;
+    use bevy::winit::WinitPlugin;
+
+    use super::*;
+
+    /// The client's Place loading with no window or GPU.
+    fn app() -> App {
+        let mut app = App::new();
+        crate::source::register(&mut app);
+        app.add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    meta_check: AssetMetaCheck::Never,
+                    ..default()
+                })
+                .set(RenderPlugin {
+                    render_creation: WgpuSettings {
+                        backends: None,
+                        ..default()
+                    }
+                    .into(),
+                    ..default()
+                })
+                .disable::<WinitPlugin>()
+                .disable::<bevy::log::LogPlugin>(),
+        )
+        .add_plugins(PlacesPlugin);
+        app.finish();
+        app.cleanup();
+        app
+    }
+
+    fn example(name: &str) -> String {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../places");
+        dir.join(name).display().to_string()
+    }
+
+    /// A Place folder in a temp dir holding the given files.
+    fn temp_place(name: &str, files: &[(&str, &str)]) -> String {
+        let dir: PathBuf = std::env::temp_dir().join(format!("placefinder-client-test-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for (file, text) in files {
+            std::fs::write(dir.join(file), text).unwrap();
+        }
+        dir.display().to_string()
+    }
+
+    /// Travels to `target` and runs the app until the load finishes.
+    fn travel(app: &mut App, target: &str) {
+        app.world_mut().write_message(Travel {
+            target: target.into(),
+            from_portal: false,
+        });
+        app.update();
+        let start = Instant::now();
+        while app.world().resource::<Status>().loading.is_some() {
+            assert!(
+                start.elapsed() < Duration::from_secs(20),
+                "{target} didn't load: {:?}",
+                app.world().resource::<Status>().error
+            );
+            std::thread::sleep(Duration::from_millis(5));
+            app.update();
+        }
+    }
+
+    fn current(app: &App) -> String {
+        let status = app.world().resource::<Status>();
+        status.current.as_ref().unwrap().address.to_string()
+    }
+
+    #[test]
+    fn loads_gltf_and_glb_places() {
+        let mut app = app();
+        for name in ["garden", "meadow"] {
+            travel(&mut app, &example(name));
+            assert_eq!(app.world().resource::<Status>().error, None);
+            assert_eq!(current(&app), example(name));
+        }
+    }
+
+    #[test]
+    fn a_failed_load_keeps_the_current_place() {
+        let manifest = "version = 0\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (0.0, 0.0, 0.0)";
+        let failing = [
+            temp_place("missing-scene", &[("place.con", manifest)]),
+            temp_place("invalid", &[("place.con", "name = 3")]),
+            temp_place("empty", &[]),
+        ];
+        let mut app = app();
+        travel(&mut app, &example("garden"));
+        for target in &failing {
+            travel(&mut app, target);
+            assert!(app.world().resource::<Status>().error.is_some(), "{target}");
+            assert_eq!(current(&app), example("garden"));
+        }
+    }
+}
