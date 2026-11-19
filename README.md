@@ -2,6 +2,10 @@
 
 An experimental new type of web browser for 3D experiences.
 
+## Requirements
+
+- [Rust toolchain](https://rust-lang.org/tools/install)
+
 ## Build
 
 ```
