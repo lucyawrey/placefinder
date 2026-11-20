@@ -1,5 +1,5 @@
 use bevy::input::mouse::AccumulatedMouseMotion;
-use bevy::mesh::{Indices, PrimitiveTopology};
+use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
@@ -104,6 +104,7 @@ fn scene_ready(
 
 fn build_world(
     mut collision: ResMut<Collision>,
+    mut player: Single<&mut Player>,
     status: Res<Status>,
     meshes: Res<Assets<Mesh>>,
     solids: Query<(Entity, &Mesh3d, &GlobalTransform), Without<Portal>>,
@@ -122,7 +123,10 @@ fn build_world(
             add_triangles(mesh, global, &mut vertices, &mut triangles);
         }
     }
-    *collision = Collision::Built(Box::new(motor::World::new(vertices, triangles)));
+    let world = motor::World::new(vertices, triangles);
+    player.state = motor::spawn(&world, player.state.spawn);
+    player.previous = player.state.feet;
+    *collision = Collision::Built(Box::new(world));
 }
 
 /// Adds a mesh's triangles, in world space, to the collision world being built.
@@ -133,6 +137,7 @@ fn add_triangles(
     triangles: &mut Vec<[u32; 3]>,
 ) {
     if mesh.primitive_topology() != PrimitiveTopology::TriangleList {
+        warn!("no collision for a mesh that isn't a triangle list");
         return;
     }
     let Some(positions) = mesh
@@ -141,14 +146,14 @@ fn add_triangles(
         .flatten()
         .and_then(|p| p.as_float3())
     else {
+        warn!("no collision for a mesh without 32-bit float positions");
         return;
     };
     let first = vertices.len() as u32;
     let affine = global.affine();
     vertices.extend(positions.iter().map(|&p| affine.transform_point3(p.into())));
     let indices: Vec<u32> = match mesh.indices() {
-        Some(Indices::U16(i)) => i.iter().map(|&i| i as u32).collect(),
-        Some(Indices::U32(i)) => i.clone(),
+        Some(indices) => indices.iter().map(|i| i as u32).collect(),
         None => (0..positions.len() as u32).collect(),
     };
     let mirrored = affine.matrix3.determinant() < 0.0;
@@ -261,9 +266,9 @@ mod tests {
         // The platform's top.
         assert!((rest_height(world, 0.0, -1.5) - 1.25).abs() < 0.05);
         // The rotated, scaled box under a parent at (8, 0, 2): its top is 2 m up, its long axis
-        // runs from the center toward +x, -z, and its bounds reach past its faces along +x.
+        // runs from the center toward +x, -z, and its bounds reach 1.7 m past its +x, +z face.
         let half = 1.8 / 2f32.sqrt();
         assert!((rest_height(world, 8.0 + half, 2.0 - half) - 2.0).abs() < 0.05);
-        assert!(rest_height(world, 9.8, 2.0).abs() < 0.05);
+        assert!(rest_height(world, 9.9, 3.9).abs() < 0.05);
     }
 }

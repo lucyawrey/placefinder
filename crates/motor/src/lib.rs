@@ -80,76 +80,48 @@ pub struct Input {
     pub jump: bool,
 }
 
+/// Places the player at `at`, lifted onto the top of any solid mesh `at` is inside.
+pub fn spawn(world: &World, at: Vec3) -> State {
+    let mut feet = at;
+    if let Some(mesh) = &world.0 {
+        // Inside a closed mesh, a ray straight up meets the back of its upward-facing top.
+        // Only checked here: from below, an upper story's floor faces up too.
+        while let Some(hit) =
+            mesh.cast_ray_and_get_normal(&Pose::IDENTITY, &Ray::new(feet, Vec3::Y), f32::MAX, false)
+        {
+            // The hit's normal faces the ray; the triangle's own normal says which side was hit.
+            let normal = mesh.triangle(hit.subshape).normal();
+            if !normal.is_some_and(|n| n.y > 0.0) {
+                break;
+            }
+            feet.y += hit.time_of_impact + SKIN;
+        }
+    }
+    State {
+        feet,
+        ..State::at(at)
+    }
+}
+
 /// Advances the player by `dt` seconds.
 pub fn step(world: &World, settings: &Settings, state: State, input: Input, dt: f32) -> State {
-    let Some(mesh) = &world.0 else {
-        return fall(settings, state, dt);
+    let state = match &world.0 {
+        Some(mesh) => Body { mesh, settings }.advance(state, input, dt),
+        None => fall(settings, state, dt),
     };
-    let body = Body { mesh, settings };
-    let mut feet = body.push_out(state.feet);
-    let mut velocity = Vec3::new(input.wish.x, 0.0, input.wish.z) * settings.speed;
-    let mut standing = state.standing;
-    if standing && input.jump {
-        velocity.y = (2.0 * settings.gravity * settings.jump_height).sqrt();
-        standing = false;
-    } else if !standing {
-        velocity.y = state.velocity.y - settings.gravity * dt;
+    if state.feet.y < state.spawn.y - settings.respawn_depth {
+        return spawn(world, state.spawn);
     }
-
-    let across = Vec3::new(velocity.x, 0.0, velocity.z) * dt;
-    if across != Vec3::ZERO {
-        feet = if standing {
-            body.walk(feet, across)
-        } else {
-            body.slide(feet, across, Climb::Any)
-        };
-    }
-
-    if standing {
-        match body.ground(feet, settings.step_height) {
-            Some((drop, _)) => feet.y -= drop,
-            None => standing = false,
-        }
-    } else {
-        let moved = body.slide(feet, Vec3::Y * velocity.y * dt, Climb::Any);
-        let blocked = (moved.y - feet.y).abs() < (velocity.y * dt).abs() - SKIN;
-        feet = moved;
-        if blocked && velocity.y < 0.0 && body.ground(feet, SKIN).is_some() {
-            standing = true;
-        }
-        if blocked {
-            velocity.y = 0.0;
-        }
-    }
-    if standing {
-        velocity.y = 0.0;
-    }
-
-    let state = State {
-        feet,
-        velocity,
-        standing,
-        ..state
-    };
-    respawn_if_lost(settings, state)
+    state
 }
 
 fn fall(settings: &Settings, state: State, dt: f32) -> State {
     let velocity = Vec3::Y * (state.velocity.y - settings.gravity * dt);
-    let state = State {
+    State {
         feet: state.feet + velocity * dt,
         velocity,
         standing: false,
         ..state
-    };
-    respawn_if_lost(settings, state)
-}
-
-fn respawn_if_lost(settings: &Settings, state: State) -> State {
-    if state.feet.y < state.spawn.y - settings.respawn_depth {
-        State::at(state.spawn)
-    } else {
-        state
     }
 }
 
@@ -167,6 +139,54 @@ struct Body<'a> {
 }
 
 impl Body<'_> {
+    fn advance(&self, state: State, input: Input, dt: f32) -> State {
+        let mut feet = self.push_out(state.feet);
+        let mut velocity = Vec3::new(input.wish.x, 0.0, input.wish.z) * self.settings.speed;
+        let mut standing = state.standing;
+        if standing && input.jump {
+            velocity.y = (2.0 * self.settings.gravity * self.settings.jump_height).sqrt();
+            standing = false;
+        } else if !standing {
+            velocity.y = state.velocity.y - self.settings.gravity * dt;
+        }
+
+        let across = Vec3::new(velocity.x, 0.0, velocity.z) * dt;
+        if across != Vec3::ZERO {
+            feet = if standing {
+                self.walk(feet, across)
+            } else {
+                self.slide(feet, across, Climb::Walkable)
+            };
+        }
+
+        if standing {
+            match self.ground(feet, self.settings.step_height) {
+                Some((drop, _)) => feet.y -= drop,
+                None => standing = false,
+            }
+        } else {
+            let moved = self.slide(feet, Vec3::Y * velocity.y * dt, Climb::Any);
+            let blocked = (moved.y - feet.y).abs() < (velocity.y * dt).abs() - SKIN;
+            feet = moved;
+            if blocked && velocity.y < 0.0 && self.ground(feet, SKIN).is_some() {
+                standing = true;
+            }
+            if blocked {
+                velocity.y = 0.0;
+            }
+        }
+        if standing {
+            velocity.y = 0.0;
+        }
+
+        State {
+            feet,
+            velocity,
+            standing,
+            ..state
+        }
+    }
+
     fn capsule(&self) -> Capsule {
         let s = self.settings;
         Capsule::new_y(s.height / 2.0 - s.radius, s.radius)
@@ -245,7 +265,8 @@ impl Body<'_> {
     /// Moves a standing body, stepping up ledges up to the step height.
     fn walk(&self, feet: Vec3, across: Vec3) -> Vec3 {
         let flat = self.slide(feet, across, Climb::Walkable);
-        if flat.distance_squared(feet + across) < 1e-6 {
+        let gained = |to: Vec3| Vec3::new(to.x - feet.x, 0.0, to.z - feet.z).length();
+        if gained(flat) > across.length() - 1e-4 {
             return flat;
         }
         let up = self.slide(feet, Vec3::Y * self.settings.step_height, Climb::Any);
@@ -258,7 +279,6 @@ impl Body<'_> {
         if support > feet.y + self.settings.step_height + SKIN {
             return flat;
         }
-        let gained = |to: Vec3| Vec3::new(to.x - feet.x, 0.0, to.z - feet.z).length();
         if gained(stepped) > gained(flat) + 1e-4 {
             stepped
         } else {
@@ -283,10 +303,21 @@ impl Body<'_> {
                 .map(|hit| below.y + r - hit.time_of_impact)
         };
         let r = r * 0.9;
-        [(0.0, 0.0), (r, 0.0), (-r, 0.0), (0.0, r), (0.0, -r)]
-            .into_iter()
-            .filter_map(|(x, z)| probe(x, z))
-            .reduce(f32::max)
-            .map(|support| (travel, support))
+        let d = r * std::f32::consts::FRAC_1_SQRT_2;
+        [
+            (0.0, 0.0),
+            (r, 0.0),
+            (-r, 0.0),
+            (0.0, r),
+            (0.0, -r),
+            (d, d),
+            (d, -d),
+            (-d, d),
+            (-d, -d),
+        ]
+        .into_iter()
+        .filter_map(|(x, z)| probe(x, z))
+        .reduce(f32::max)
+        .map(|support| (travel, support))
     }
 }

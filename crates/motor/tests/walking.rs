@@ -1,4 +1,4 @@
-use motor::{Input, Settings, State, Vec3, World, step};
+use motor::{Input, Settings, State, Vec3, World, spawn, step};
 use parry3d::glamx::Quat;
 
 const DT: f32 = 1.0 / 64.0;
@@ -131,6 +131,24 @@ fn is_stopped_by_a_ramp_too_steep_to_walk() {
 }
 
 #[test]
+fn cannot_climb_a_too_steep_ramp_by_jumping_into_it() {
+    let world = ramp(62.0);
+    let settings = Settings::default();
+    let mut state = settle(&world, State::at(Vec3::new(0.0, 0.0, 1.0)));
+    let mut input = Input {
+        wish: -Vec3::Z,
+        jump: true,
+    };
+    let mut peak: f32 = 0.0;
+    for _ in 0..64 * 5 {
+        state = step(&world, &settings, state, input, DT);
+        input.jump = false;
+        peak = peak.max(state.feet.y);
+    }
+    assert!(peak < settings.jump_height + 0.1, "{peak}");
+}
+
+#[test]
 fn climbs_a_step_under_the_step_height_but_not_over_it() {
     let low = Shapes::default()
         .floor(0.0, 6)
@@ -204,6 +222,18 @@ fn stands_still_partly_over_a_platform_edge() {
 }
 
 #[test]
+fn stands_still_partly_over_a_platform_corner() {
+    let world = Shapes::default()
+        .floor(0.0, 6)
+        .block(Vec3::new(-2.0, 0.0, -2.0), Vec3::new(0.0, 1.0, 0.0))
+        .world();
+    let feet = Vec3::new(0.07, 1.0, 0.07);
+    let state = settle(&world, State::at(feet));
+    assert!(state.standing, "{state:?}");
+    assert!((state.feet - feet).length() < 0.05, "{state:?}");
+}
+
+#[test]
 fn walks_around_inside_a_hollow_room() {
     let mut shapes = Shapes::default().floor(0.0, 6);
     // Walls and roof of a 6 m room, as one mesh's faces seen from inside.
@@ -253,6 +283,19 @@ fn is_pushed_out_when_starting_inside_a_box() {
     let state = settle(&world, State::at(Vec3::new(0.0, 0.2, 0.0)));
     assert!(state.standing, "{state:?}");
     assert!(state.feet.y > 0.35, "{state:?}");
+}
+
+#[test]
+fn spawns_on_top_of_a_solid_mesh_it_starts_inside() {
+    let world = Shapes::default()
+        .floor(0.0, 6)
+        .block(Vec3::new(-3.0, 0.0, -3.0), Vec3::new(3.0, 2.0, 3.0))
+        .world();
+    let state = settle(&world, spawn(&world, Vec3::new(0.0, 0.5, 0.0)));
+    assert!(
+        state.standing && (state.feet.y - 2.0).abs() < 0.05,
+        "{state:?}"
+    );
 }
 
 #[test]
