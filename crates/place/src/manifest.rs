@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use check_core::modules::MemFiles;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// The manifest version this client reads.
 pub const VERSION: i64 = 0;
@@ -11,7 +11,7 @@ const CLASS: &str = include_str!("place.check");
 
 pub type Point = [f64; 3];
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Manifest {
     pub version: i64,
     pub name: String,
@@ -21,7 +21,7 @@ pub struct Manifest {
     pub portals: Vec<Portal>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Portal {
     pub target: String,
     pub center: Point,
