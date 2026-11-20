@@ -28,7 +28,7 @@ use rmcp::{tool, tool_router};
 use tokio::sync::oneshot;
 
 use crate::places::{Status, Travel, Traveling};
-use crate::player::{HALF_SIZE, Player};
+use crate::player::Player;
 
 pub const PORT: u16 = 7414;
 const KEPT_LINES: usize = 1000;
@@ -330,7 +330,7 @@ impl Scene<'_, '_> {
             .collect();
         let player = self.player.single().ok().map(|p| {
             json!({
-                "position": (p.translation() - Vec3::Y * HALF_SIZE.y).to_array(),
+                "position": p.translation().to_array(),
                 "facing": self.camera.single().ok().map(|c| c.forward().to_array()),
             })
         });

@@ -2292,6 +2292,7 @@ dependencies = [
  "base64",
  "bevy",
  "image",
+ "motor",
  "place",
  "rmcp",
  "tokio",

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::places::{Arrived, Travel};
-use crate::player::{HALF_SIZE, Player};
+use crate::player::{Movement, Player};
 
 /// Shows each Portal in the manifest as a glowing box and travels when the player walks in.
 pub struct PortalsPlugin;
@@ -52,11 +52,15 @@ fn spawn_portals(
 fn enter(
     mut portals: Query<(&mut Portal, &GlobalTransform)>,
     player: Single<&Transform, With<Player>>,
+    movement: Res<Movement>,
     mut travel: MessageWriter<Travel>,
 ) {
+    let body = &movement.0;
+    let half_size = Vec3::new(body.radius, body.height / 2.0, body.radius);
+    let center = player.translation + Vec3::Y * half_size.y;
     for (mut portal, global) in &mut portals {
-        let gap = (player.translation - global.translation()).abs();
-        let inside = gap.cmplt(portal.half_size + HALF_SIZE).all();
+        let gap = (center - global.translation()).abs();
+        let inside = gap.cmplt(portal.half_size + half_size).all();
         if inside && portal.armed {
             portal.armed = false;
             travel.write(Travel {
