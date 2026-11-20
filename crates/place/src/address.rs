@@ -61,7 +61,8 @@ impl Address {
             return Err(AddressError::Empty);
         }
         let Some(rest) = input.strip_prefix(SCHEME) else {
-            return Ok(Address::Folder(PathBuf::from(input)));
+            let path = std::path::absolute(input).unwrap_or_else(|_| input.into());
+            return Ok(Address::Folder(normalize_path(&path)));
         };
         let (rest, fragment) = split_fragment(rest);
         let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
@@ -337,6 +338,15 @@ mod tests {
         assert_eq!(
             from.resolve(absolute.to_str().unwrap()).unwrap(),
             Address::Folder(absolute)
+        );
+    }
+
+    #[test]
+    fn relative_folders_become_absolute() {
+        let cwd = std::env::current_dir().unwrap();
+        assert_eq!(
+            parse("places/./x/../garden"),
+            Address::Folder(cwd.join("places").join("garden"))
         );
     }
 }

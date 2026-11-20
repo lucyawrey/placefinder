@@ -254,7 +254,8 @@ pub(crate) mod tests {
 
     pub(crate) fn example(name: &str) -> String {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../places");
-        dir.join(name).display().to_string()
+        let path = dir.join(name).display().to_string();
+        Address::parse(&path).unwrap().to_string()
     }
 
     /// A Place folder in a temp dir holding the given files.

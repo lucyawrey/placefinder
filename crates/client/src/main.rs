@@ -9,7 +9,7 @@ mod portals;
 mod source;
 
 use bevy::asset::AssetMetaCheck;
-use bevy::log::LogPlugin;
+use bevy::log::{DEFAULT_FILTER, LogPlugin};
 use bevy::prelude::*;
 
 /// `client [--mcp [port]] [address]`: opens the Placefinder prototype, at the address if one is
@@ -44,6 +44,7 @@ fn main() {
                 ..default()
             })
             .set(LogPlugin {
+                filter: format!("{DEFAULT_FILTER}rmcp=warn"),
                 custom_layer: mcp::log_layer,
                 ..default()
             }),

@@ -4,13 +4,13 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
 use base64::Engine;
+use bevy::camera::RenderTarget;
 use bevy::ecs::system::SystemParam;
 use bevy::log::BoxedLayer;
 use bevy::log::tracing::field::{Field, Visit};
 use bevy::log::tracing::{Event, Subscriber};
 use bevy::log::tracing_subscriber::Layer;
 use bevy::log::tracing_subscriber::layer::Context;
-use bevy::camera::RenderTarget;
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
@@ -167,7 +167,7 @@ impl Tools {
     }
 
     #[tool(
-        description = "Describe the current Place: its address and manifest, the named nodes of its scene with their world transforms, and the player's position (at their feet) and facing direction. Address and manifest are null when no Place is loaded."
+        description = "Describe the current Place: its address and manifest, the named nodes of its scene with their world transforms (rotation as an x, y, z, w quaternion) and each one's parent (its index in the list, or null), and the player's position (at their feet) and facing direction. Address and manifest are null when no Place is loaded."
     )]
     async fn inspect_scene(&self) -> CallToolResult {
         match self.ask(Request::Inspect).await {
@@ -283,6 +283,7 @@ struct Offscreen;
 #[derive(SystemParam)]
 struct Scene<'w, 's> {
     children: Query<'w, 's, &'static Children>,
+    parents: Query<'w, 's, &'static ChildOf>,
     nodes: Query<'w, 's, (&'static Name, &'static GlobalTransform)>,
     player: Query<'w, 's, &'static GlobalTransform, With<Player>>,
     camera: Query<'w, 's, &'static GlobalTransform, (With<Camera3d>, Without<Offscreen>)>,
@@ -291,14 +292,23 @@ struct Scene<'w, 's> {
 impl Scene<'_, '_> {
     fn inspect(&self, status: &Status) -> Value {
         let current = status.current.as_ref();
-        let nodes: Vec<Value> = current
+        let named: Vec<Entity> = current
             .into_iter()
             .flat_map(|c| self.children.iter_descendants(c.root))
-            .filter_map(|entity| self.nodes.get(entity).ok())
-            .map(|(name, transform)| {
+            .filter(|&entity| self.nodes.contains(entity))
+            .collect();
+        let nodes: Vec<Value> = named
+            .iter()
+            .map(|&entity| {
+                let (name, transform) = self.nodes.get(entity).unwrap();
+                let parent = self
+                    .parents
+                    .iter_ancestors(entity)
+                    .find_map(|a| named.iter().position(|&e| e == a));
                 let (scale, rotation, translation) = transform.to_scale_rotation_translation();
                 json!({
                     "name": name.as_str(),
+                    "parent": parent,
                     "translation": translation.to_array(),
                     "rotation": rotation.to_array(),
                     "scale": scale.to_array(),
@@ -573,6 +583,10 @@ mod tests {
             .map(|n| n["name"].as_str().unwrap())
             .collect();
         assert!(names.contains(&"crate"), "{scene}");
+        let meshes = scene["nodes"].as_array().unwrap().iter();
+        let mut meshes = meshes.filter(|n| n["name"] == "Mesh").peekable();
+        assert!(meshes.peek().is_some(), "{scene}");
+        assert!(meshes.all(|n| n["parent"].is_u64()), "{scene}");
     }
 
     #[test]
