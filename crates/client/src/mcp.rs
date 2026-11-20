@@ -10,8 +10,11 @@ use bevy::log::tracing::field::{Field, Visit};
 use bevy::log::tracing::{Event, Subscriber};
 use bevy::log::tracing_subscriber::Layer;
 use bevy::log::tracing_subscriber::layer::Context;
+use bevy::camera::RenderTarget;
 use bevy::prelude::*;
+use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
+use bevy::window::PrimaryWindow;
 use bevy::winit::WinitSettings;
 use place::Address;
 use rmcp::handler::server::wrapper::Parameters;
@@ -32,6 +35,7 @@ const KEPT_LINES: usize = 1000;
 const TIMEOUT: Duration = Duration::from_secs(30);
 const REPLACED: &str = "[a load that another travel replaced before it finished]";
 const TIMED_OUT: &str = "[a request the client didn't answer within 30 seconds]";
+const NO_VIEW: &str = "[a screenshot asked for before the client has a window and a camera]";
 const CLOSED: &str = "[a request the client closed before answering]";
 
 /// Serves the developer MCP on `127.0.0.1:<port>`; port 0 picks a free one.
@@ -172,7 +176,7 @@ impl Tools {
         }
     }
 
-    #[tool(description = "Take a screenshot of the client's window, as a PNG image.")]
+    #[tool(description = "Take a screenshot of the player's view, as a PNG image.")]
     async fn screenshot(&self) -> CallToolResult {
         match self.ask(Request::Screenshot).await {
             Ok(Ok(png)) => CallToolResult::success(vec![ContentBlock::image(
@@ -215,6 +219,8 @@ fn answer(
     status: Res<Status>,
     mut travel: MessageWriter<Travel>,
     scene: Scene,
+    window: Query<&Window, With<PrimaryWindow>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     for (address, reply) in std::mem::take(&mut *loads) {
         match outcome(&status, &address) {
@@ -235,13 +241,34 @@ fn answer(
                 Err(e) => _ = reply.send(Err(e.to_string())),
             },
             Request::Inspect(reply) => _ = reply.send(scene.inspect(&status)),
+            // macOS doesn't draw a covered window, so a window screenshot comes back empty.
+            // A camera following the player's renders into an image instead.
             Request::Screenshot(reply) => {
+                let (Ok(window), Ok(eye)) = (window.single(), scene.camera.single()) else {
+                    _ = reply.send(Err(NO_VIEW.into()));
+                    continue;
+                };
+                let image = images.add(Image::new_target_texture(
+                    window.physical_width(),
+                    window.physical_height(),
+                    TextureFormat::Rgba8UnormSrgb,
+                    None,
+                ));
+                let camera = commands
+                    .spawn((
+                        Camera3d::default(),
+                        RenderTarget::from(image.clone()),
+                        eye.compute_transform(),
+                        Offscreen,
+                    ))
+                    .id();
                 let mut reply = Some(reply);
-                commands.spawn(Screenshot::primary_window()).observe(
-                    move |captured: On<ScreenshotCaptured>| {
+                commands.spawn(Screenshot::image(image)).observe(
+                    move |captured: On<ScreenshotCaptured>, mut commands: Commands| {
                         if let Some(reply) = reply.take() {
                             _ = reply.send(png(captured.image.clone()));
                         }
+                        commands.entity(camera).despawn();
                     },
                 );
             }
@@ -249,12 +276,16 @@ fn answer(
     }
 }
 
+/// The camera a screenshot renders with.
+#[derive(Component)]
+struct Offscreen;
+
 #[derive(SystemParam)]
 struct Scene<'w, 's> {
     children: Query<'w, 's, &'static Children>,
     nodes: Query<'w, 's, (&'static Name, &'static GlobalTransform)>,
     player: Query<'w, 's, &'static GlobalTransform, With<Player>>,
-    camera: Query<'w, 's, &'static GlobalTransform, With<Camera3d>>,
+    camera: Query<'w, 's, &'static GlobalTransform, (With<Camera3d>, Without<Offscreen>)>,
 }
 
 impl Scene<'_, '_> {

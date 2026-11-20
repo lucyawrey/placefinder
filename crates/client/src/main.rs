@@ -1,5 +1,5 @@
-// Bevy system parameters are long query types by nature.
-#![allow(clippy::type_complexity)]
+// Bevy systems take many parameters, often long query types.
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 mod address_bar;
 mod mcp;
