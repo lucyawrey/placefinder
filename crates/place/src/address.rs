@@ -112,9 +112,10 @@ impl Address {
                     .map(String::as_str)
                     .chain(relative.split('/'));
                 Ok(Address::Served(Served {
+                    host: served.host.clone(),
+                    port: served.port,
                     path: normalize(segments)?,
                     fragment,
-                    ..served.clone()
                 }))
             }
         }
