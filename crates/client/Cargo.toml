@@ -8,6 +8,7 @@ axum = "0.8.9"
 base64 = "0.23.1"
 bevy = "0.20.1"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
+motor = { version = "0.1.0", path = "../motor" }
 place = { version = "0.1.0", path = "../place" }
 rmcp = { version = "3.11.0", features = ["transport-streamable-http-server"] }
 tokio = { version = "1.54.1", features = ["rt", "net", "sync", "time"] }

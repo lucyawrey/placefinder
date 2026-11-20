@@ -1,0 +1,650 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 864,
+      "max": [
+        12.0,
+        0.0,
+        12.0
+      ],
+      "min": [
+        -12.0,
+        0.0,
+        -12.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 864,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 180,
+      "max": [
+        1.0,
+        1.25,
+        2.0
+      ],
+      "min": [
+        -1.0,
+        0.0,
+        -2.9802322387695312e-8
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 180,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5126,
+      "count": 36,
+      "max": [
+        1.5,
+        1.25,
+        0.0
+      ],
+      "min": [
+        -1.5,
+        0.0,
+        -3.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 36,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 36,
+      "max": [
+        5.0,
+        0.5,
+        6.0
+      ],
+      "min": [
+        3.0,
+        0.0,
+        4.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 36,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 36,
+      "max": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -6.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 36,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 10,
+      "componentType": 5126,
+      "count": 36,
+      "max": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -6.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 11,
+      "componentType": 5126,
+      "count": 36,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 12,
+      "componentType": 5126,
+      "count": 108,
+      "max": [
+        10.0,
+        3.0,
+        -6.0
+      ],
+      "min": [
+        2.0,
+        0.0,
+        -6.199999809265137
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 13,
+      "componentType": 5126,
+      "count": 108,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 14,
+      "componentType": 5126,
+      "count": 180,
+      "max": [
+        -4.0,
+        3.0,
+        10.0
+      ],
+      "min": [
+        -10.0,
+        0.0,
+        3.999999761581421
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 15,
+      "componentType": 5126,
+      "count": 180,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 16,
+      "componentType": 5126,
+      "count": 36,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 17,
+      "componentType": 5126,
+      "count": 36,
+      "type": "VEC3"
+    }
+  ],
+  "asset": {
+    "generator": "placefinder collision_test example",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 10368,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 10368,
+      "byteOffset": 10368
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2160,
+      "byteOffset": 20736
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2160,
+      "byteOffset": 22896
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 25056
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 25488
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 25920
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 26352
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 26784
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 27216
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 27648
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 28080
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1296,
+      "byteOffset": 28512
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1296,
+      "byteOffset": 29808
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2160,
+      "byteOffset": 31104
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2160,
+      "byteOffset": 33264
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 35424
+    },
+    {
+      "buffer": 0,
+      "byteLength": 432,
+      "byteOffset": 35856
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 36288,
+      "uri": "scene.bin"
+    }
+  ],
+  "materials": [
+    {
+      "name": "grey",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.6,
+          0.6,
+          0.62,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.9
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "floor",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "stairs",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 3,
+            "POSITION": 2
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "platform",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 5,
+            "POSITION": 4
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "tall step",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 7,
+            "POSITION": 6
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "gentle ramp",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 9,
+            "POSITION": 8
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "steep ramp",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 11,
+            "POSITION": 10
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "doorway",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 13,
+            "POSITION": 12
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "hollow room",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 15,
+            "POSITION": 14
+          },
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "rotated box",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 17,
+            "POSITION": 16
+          },
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "floor",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 1,
+      "name": "stairs",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 2,
+      "name": "platform",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 3,
+      "name": "tall step",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 4,
+      "name": "gentle ramp",
+      "rotation": [
+        0.1736481785774231,
+        0.0,
+        0.0,
+        0.9848077297210693
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        -6.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 5,
+      "name": "steep ramp",
+      "rotation": [
+        0.5735764503479004,
+        0.0,
+        0.0,
+        0.8191520571708679
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        -9.5,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 6,
+      "name": "doorway",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 7,
+      "name": "hollow room",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "mesh": 8,
+      "name": "rotated box",
+      "rotation": [
+        0.0,
+        0.3826834559440613,
+        0.0,
+        0.9238795042037964
+      ],
+      "scale": [
+        2.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "children": [
+        8
+      ],
+      "name": "rotated box parent",
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "translation": [
+        8.0,
+        0.0,
+        2.0
+      ]
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "collision test",
+      "nodes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9
+      ]
+    }
+  ]
+}

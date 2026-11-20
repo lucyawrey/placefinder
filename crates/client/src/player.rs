@@ -1,43 +1,72 @@
-use bevy::camera::primitives::Aabb;
 use bevy::input::mouse::AccumulatedMouseMotion;
+use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
+use bevy::world_serialization::WorldInstanceReady;
+use motor::{Input, Settings, State};
 
-use crate::places::{Arrived, Status};
+use crate::places::{Arrived, Status, Traveling};
 use crate::portals::Portal;
 
-/// A first-person player that walks on and bumps into the current Place's meshes as boxes.
+/// A first-person player that walks on and bumps into the current Place's meshes.
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn)
-            .add_systems(Update, (place_at_spawn, look, walk).chain());
+        app.init_resource::<Movement>()
+            .init_resource::<Collision>()
+            .add_systems(Startup, spawn)
+            .add_systems(
+                Update,
+                // Same frame as arrival, before the scene spawns and marks itself ready.
+                (place_at_spawn, build_world, look, read_input, show)
+                    .chain()
+                    .after(Traveling),
+            )
+            .add_systems(FixedUpdate, walk)
+            .add_observer(scene_ready);
     }
 }
 
-#[derive(Component, Default)]
+/// The player's `Transform` is at their feet.
+#[derive(Component)]
 pub struct Player {
     yaw: f32,
     pitch: f32,
-    fall_speed: f32,
+    state: State,
+    /// Where the feet were before the last tick, for drawing between ticks.
+    previous: Vec3,
+    input: Input,
 }
 
-/// Half the player's width and height; the camera sits near the top.
-pub const HALF_SIZE: Vec3 = Vec3::new(0.3, 0.9, 0.3);
-const EYE: f32 = 0.7;
-const SPEED: f32 = 4.0;
-const GRAVITY: f32 = 20.0;
-/// How far the player is kept from a box they were pushed out of, since f32 rounding can
-/// otherwise leave them just inside it.
-const GAP: f32 = 0.001;
+#[derive(Resource, Default)]
+pub struct Movement(pub Settings);
+
+/// The current Place's collision world, `None` until its scene has spawned.
+#[derive(Resource, Default)]
+enum Collision {
+    #[default]
+    None,
+    /// The scene has spawned; its world transforms are ready next frame.
+    Spawned,
+    Built(Box<motor::World>),
+}
+
+/// The camera's height above the feet.
+const EYE: f32 = 1.6;
 const SENSITIVITY: f32 = 0.002;
 
 fn spawn(mut commands: Commands) {
     commands
         .spawn((
-            Player::default(),
-            Transform::from_xyz(0.0, HALF_SIZE.y, 0.0),
+            Player {
+                yaw: 0.0,
+                pitch: 0.0,
+                state: State::at(Vec3::ZERO),
+                previous: Vec3::ZERO,
+                input: Input::default(),
+            },
+            Transform::default(),
             Visibility::default(),
         ))
         .with_child((Camera3d::default(), Transform::from_xyz(0.0, EYE, 0.0)));
@@ -50,12 +79,88 @@ fn spawn(mut commands: Commands) {
 fn place_at_spawn(
     mut arrived: MessageReader<Arrived>,
     mut player: Single<(&mut Transform, &mut Player)>,
+    mut collision: ResMut<Collision>,
 ) {
     if let Some(arrived) = arrived.read().last() {
-        let [x, y, z] = arrived.manifest.spawn.map(|v| v as f32);
-        player.0.translation = Vec3::new(x, y + HALF_SIZE.y + GAP, z);
-        player.1.fall_speed = 0.0;
+        let spawn = Vec3::from_array(arrived.manifest.spawn.map(|v| v as f32));
+        player.0.translation = spawn;
+        player.1.state = State::at(spawn);
+        player.1.previous = spawn;
+        *collision = Collision::None;
     }
+}
+
+fn scene_ready(
+    ready: On<WorldInstanceReady>,
+    status: Res<Status>,
+    parents: Query<&ChildOf>,
+    mut collision: ResMut<Collision>,
+) {
+    let current = status.current.as_ref().map(|c| c.root);
+    if parents.get(ready.entity).ok().map(|p| p.parent()) == current {
+        *collision = Collision::Spawned;
+    }
+}
+
+fn build_world(
+    mut collision: ResMut<Collision>,
+    mut player: Single<&mut Player>,
+    status: Res<Status>,
+    meshes: Res<Assets<Mesh>>,
+    solids: Query<(Entity, &Mesh3d, &GlobalTransform), Without<Portal>>,
+    parents: Query<&ChildOf>,
+) {
+    let (Collision::Spawned, Some(current)) = (&*collision, &status.current) else {
+        return;
+    };
+    let mut vertices = Vec::new();
+    let mut triangles = Vec::new();
+    for (entity, handle, global) in &solids {
+        if !parents.iter_ancestors(entity).any(|a| a == current.root) {
+            continue;
+        }
+        if let Some(mesh) = meshes.get(handle) {
+            add_triangles(mesh, global, &mut vertices, &mut triangles);
+        }
+    }
+    let world = motor::World::new(vertices, triangles);
+    player.state = motor::spawn(&world, player.state.spawn);
+    player.previous = player.state.feet;
+    *collision = Collision::Built(Box::new(world));
+}
+
+/// Adds a mesh's triangles, in world space, to the collision world being built.
+fn add_triangles(
+    mesh: &Mesh,
+    global: &GlobalTransform,
+    vertices: &mut Vec<Vec3>,
+    triangles: &mut Vec<[u32; 3]>,
+) {
+    if mesh.primitive_topology() != PrimitiveTopology::TriangleList {
+        warn!("no collision for a mesh that isn't a triangle list");
+        return;
+    }
+    let Some(positions) = mesh
+        .try_attribute_option(Mesh::ATTRIBUTE_POSITION)
+        .ok()
+        .flatten()
+        .and_then(|p| p.as_float3())
+    else {
+        warn!("no collision for a mesh without 32-bit float positions");
+        return;
+    };
+    let first = vertices.len() as u32;
+    let affine = global.affine();
+    vertices.extend(positions.iter().map(|&p| affine.transform_point3(p.into())));
+    let indices: Vec<u32> = match mesh.indices() {
+        Some(indices) => indices.iter().map(|i| i as u32).collect(),
+        None => (0..positions.len() as u32).collect(),
+    };
+    let mirrored = affine.matrix3.determinant() < 0.0;
+    triangles.extend(indices.as_chunks::<3>().0.iter().map(|t| {
+        let [a, b, c] = t.map(|i| first + i);
+        if mirrored { [a, c, b] } else { [a, b, c] }
+    }));
 }
 
 fn look(
@@ -78,19 +183,14 @@ fn look(
     }
 }
 
-fn walk(
-    time: Res<Time>,
+/// Reads input each frame for the next tick: the direction from the keys and facing now, and a
+/// jump press kept until a tick uses it.
+fn read_input(
     keys: Res<ButtonInput<KeyCode>>,
     cursor: Single<&CursorOptions>,
-    status: Res<Status>,
-    mut player: Single<(&mut Transform, &mut Player)>,
-    solids: Query<(Entity, &Aabb, &GlobalTransform), (With<Mesh3d>, Without<Portal>)>,
-    parents: Query<&ChildOf>,
+    mut player: Single<(&Transform, &mut Player)>,
 ) {
-    let Some(current) = &status.current else {
-        return;
-    };
-    let (transform, state) = &mut *player;
+    let (transform, player) = &mut *player;
     let mut wish = Vec3::ZERO;
     if cursor.grab_mode != CursorGrabMode::None {
         for (key, dir) in [
@@ -103,51 +203,72 @@ fn walk(
                 wish += dir;
             }
         }
+        player.input.jump |= keys.just_pressed(KeyCode::Space);
     }
-    let dt = time.delta_secs();
-    let horizontal = transform.rotation * wish.normalize_or_zero() * SPEED * dt;
-    state.fall_speed += GRAVITY * dt;
-    let boxes: Vec<(Vec3, Vec3)> = solids
-        .iter()
-        .filter(|(entity, ..)| parents.iter_ancestors(*entity).any(|a| a == current.root))
-        .map(|(_, aabb, global)| world_box(aabb, global))
-        .collect();
-    let mut position = transform.translation;
-    for (axis, delta) in [
-        (0, horizontal.x),
-        (2, horizontal.z),
-        (1, -state.fall_speed * dt),
-    ] {
-        if delta == 0.0 {
-            continue;
+    player.input.wish = transform.rotation * wish.normalize_or_zero();
+}
+
+fn walk(
+    time: Res<Time>,
+    settings: Res<Movement>,
+    collision: Res<Collision>,
+    mut player: Single<&mut Player>,
+) {
+    let Collision::Built(world) = &*collision else {
+        return;
+    };
+    player.previous = player.state.feet;
+    player.state = motor::step(
+        world,
+        &settings.0,
+        player.state,
+        player.input,
+        time.delta_secs(),
+    );
+    player.input.jump = false;
+}
+
+/// Draws the player between their last two ticks, so movement is smooth at any frame rate.
+fn show(time: Res<Time<Fixed>>, mut player: Single<(&mut Transform, &Player)>) {
+    let (transform, player) = &mut *player;
+    let t = time.overstep_fraction();
+    transform.translation = player.previous.lerp(player.state.feet, t);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::places::tests::{app_with, example, travel};
+
+    /// Where a body dropped at `x`, `z` from above comes to rest.
+    fn rest_height(world: &motor::World, x: f32, z: f32) -> f32 {
+        let settings = Settings::default();
+        let mut state = State::at(Vec3::new(x, 4.0, z));
+        for _ in 0..256 {
+            state = motor::step(world, &settings, state, Input::default(), 1.0 / 64.0);
         }
-        position[axis] += delta;
-        for &(min, max) in &boxes {
-            if overlaps(position, min, max) {
-                position[axis] = if delta > 0.0 {
-                    min[axis] - HALF_SIZE[axis] - GAP
-                } else {
-                    max[axis] + HALF_SIZE[axis] + GAP
-                };
-                if axis == 1 {
-                    state.fall_speed = 0.0;
-                }
+        state.feet.y
+    }
+
+    #[test]
+    fn builds_collision_from_the_scene_in_world_space() {
+        let mut app = app_with(|app| _ = app.add_plugins(PlayerPlugin));
+        travel(&mut app, &example("collision-test"));
+        for _ in 0..100 {
+            if matches!(app.world().resource::<Collision>(), Collision::Built(_)) {
+                break;
             }
+            app.update();
         }
+        let Collision::Built(world) = app.world().resource::<Collision>() else {
+            panic!("no collision world");
+        };
+        // The platform's top.
+        assert!((rest_height(world, 0.0, -1.5) - 1.25).abs() < 0.05);
+        // The rotated, scaled box under a parent at (8, 0, 2): its top is 2 m up, its long axis
+        // runs from the center toward +x, -z, and its bounds reach 1.7 m past its +x, +z face.
+        let half = 1.8 / 2f32.sqrt();
+        assert!((rest_height(world, 8.0 + half, 2.0 - half) - 2.0).abs() < 0.05);
+        assert!(rest_height(world, 9.9, 3.9).abs() < 0.05);
     }
-    transform.translation = position;
-}
-
-fn world_box(aabb: &Aabb, global: &GlobalTransform) -> (Vec3, Vec3) {
-    let affine = global.affine();
-    let center: Vec3 = affine.transform_point3(aabb.center.into());
-    let m = affine.matrix3;
-    let half = Vec3::from(aabb.half_extents);
-    let half: Vec3 =
-        (m.x_axis.abs() * half.x + m.y_axis.abs() * half.y + m.z_axis.abs() * half.z).into();
-    (center - half, center + half)
-}
-
-fn overlaps(center: Vec3, min: Vec3, max: Vec3) -> bool {
-    (center - HALF_SIZE).cmplt(max).all() && (center + HALF_SIZE).cmpgt(min).all()
 }
