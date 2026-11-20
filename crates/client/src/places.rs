@@ -60,10 +60,7 @@ pub struct Current {
 }
 
 #[derive(Component)]
-struct Fetching {
-    address: Address,
-    task: Task<Result<(Base, Manifest), LoadError>>,
-}
+struct Fetching(Task<(Address, Result<(Base, Manifest), LoadError>)>);
 
 #[derive(Component)]
 struct Pending {
@@ -108,9 +105,11 @@ fn start_travel(
     }
     status.loading = Some(address.to_string());
     status.error = None;
-    let fetch_address = address.clone();
-    let task = AsyncComputeTaskPool::get().spawn(async move { place::load(&fetch_address) });
-    commands.spawn(Fetching { address, task });
+    let task = AsyncComputeTaskPool::get().spawn(async move {
+        let result = place::load(&address);
+        (address, result)
+    });
+    commands.spawn(Fetching(task));
 }
 
 fn fetch_manifest(
@@ -122,7 +121,7 @@ fn fetch_manifest(
     assets: Res<AssetServer>,
 ) {
     for (entity, mut fetch) in &mut fetching {
-        let Some(result) = block_on(poll_once(&mut fetch.task)) else {
+        let Some((address, result)) = block_on(poll_once(&mut fetch.0)) else {
             continue;
         };
         commands.entity(entity).despawn();
@@ -132,7 +131,7 @@ fn fetch_manifest(
                 bases.insert(*next_number, base);
                 let path = format!("{SOURCE}://{}/{}", *next_number, manifest.scene);
                 commands.spawn(Pending {
-                    address: fetch.address.clone(),
+                    address,
                     number: *next_number,
                     gltf: assets.load(path),
                     manifest,
