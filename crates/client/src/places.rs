@@ -249,6 +249,9 @@ pub(crate) mod tests {
                     ..default()
                 })
                 .disable::<WinitPlugin>()
+                // On Windows, a second app built on the same thread crashes with these on.
+                .disable::<bevy::audio::AudioPlugin>()
+                .disable::<bevy::gilrs::GilrsPlugin>()
                 .disable::<bevy::log::LogPlugin>(),
         )
         .add_plugins(PlacesPlugin);
