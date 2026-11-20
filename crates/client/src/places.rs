@@ -18,10 +18,16 @@ impl Plugin for PlacesPlugin {
             .init_resource::<Status>()
             .add_systems(
                 Update,
-                (start_travel, fetch_manifest, finish_travel).chain(),
+                (start_travel, fetch_manifest, finish_travel)
+                    .chain()
+                    .in_set(Traveling),
             );
     }
 }
+
+/// The systems that act on `Travel`.
+#[derive(SystemSet, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Traveling;
 
 /// A request to go to an address. Typed addresses stand alone; a Portal's target is relative
 /// to the current Place.

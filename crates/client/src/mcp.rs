@@ -27,7 +27,7 @@ use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, Stream
 use rmcp::{tool, tool_router};
 use tokio::sync::oneshot;
 
-use crate::places::{Status, Travel};
+use crate::places::{Status, Travel, Traveling};
 use crate::player::{HALF_SIZE, Player};
 
 pub const PORT: u16 = 7414;
@@ -36,6 +36,7 @@ const TIMEOUT: Duration = Duration::from_secs(30);
 const REPLACED: &str = "[a load that another travel replaced before it finished]";
 const TIMED_OUT: &str = "[a request the client didn't answer within 30 seconds]";
 const NO_VIEW: &str = "[a screenshot asked for before the client has a window and a camera]";
+const MINIMIZED: &str = "[a screenshot asked for while the window is minimized]";
 const CLOSED: &str = "[a request the client closed before answering]";
 
 /// Serves the developer MCP on `127.0.0.1:<port>`; port 0 picks a free one.
@@ -74,7 +75,7 @@ impl Plugin for McpPlugin {
         app.insert_resource(Inbox(Mutex::new(inbox)))
             // Agents drive the client from another window, so it keeps running unfocused.
             .insert_resource(WinitSettings::continuous())
-            .add_systems(Update, answer);
+            .add_systems(Update, answer.before(Traveling));
     }
 }
 
@@ -221,7 +222,15 @@ fn answer(
     scene: Scene,
     window: Query<&Window, With<PrimaryWindow>>,
     mut images: ResMut<Assets<Image>>,
+    offscreen: Query<(Entity, &Offscreen)>,
+    time: Res<Time>,
 ) {
+    // A capture that never arrives would leave its camera rendering for good.
+    for (camera, spawned) in &offscreen {
+        if time.elapsed() - spawned.0 > TIMEOUT {
+            commands.entity(camera).despawn();
+        }
+    }
     for (address, reply) in std::mem::take(&mut *loads) {
         match outcome(&status, &address) {
             Some(result) => _ = reply.send(result),
@@ -248,6 +257,10 @@ fn answer(
                     _ = reply.send(Err(NO_VIEW.into()));
                     continue;
                 };
+                if window.physical_width() == 0 || window.physical_height() == 0 {
+                    _ = reply.send(Err(MINIMIZED.into()));
+                    continue;
+                }
                 let image = images.add(Image::new_target_texture(
                     window.physical_width(),
                     window.physical_height(),
@@ -259,7 +272,7 @@ fn answer(
                         Camera3d::default(),
                         RenderTarget::from(image.clone()),
                         eye.compute_transform(),
-                        Offscreen,
+                        Offscreen(time.elapsed()),
                     ))
                     .id();
                 let mut reply = Some(reply);
@@ -268,7 +281,7 @@ fn answer(
                         if let Some(reply) = reply.take() {
                             _ = reply.send(png(captured.image.clone()));
                         }
-                        commands.entity(camera).despawn();
+                        commands.entity(camera).try_despawn();
                     },
                 );
             }
@@ -276,9 +289,9 @@ fn answer(
     }
 }
 
-/// The camera a screenshot renders with.
+/// The camera a screenshot renders with, and when it was spawned.
 #[derive(Component)]
-struct Offscreen;
+struct Offscreen(Duration);
 
 #[derive(SystemParam)]
 struct Scene<'w, 's> {
