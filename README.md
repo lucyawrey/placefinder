@@ -2,6 +2,13 @@
 
 An experimental new type of web browser for 3D experiences.
 
+## Download
+
+Builds of the client (`placefinder`) and server (`placefinder-server`) for Linux (x86_64), Windows (x86_64) and macOS (Apple Silicon) are on the [Releases](https://github.com/lucyawrey/placefinder/releases) page. They take the same arguments as the `cargo run` commands below.
+
+- **Linux:** needs ALSA, udev, Wayland and xkbcommon, which most desktops already have.
+- **macOS:** the builds aren't signed, so macOS blocks them at first. Allow them with `xattr -d com.apple.quarantine placefinder` (or `placefinder-server`) in the unzipped folder.
+
 ## Requirements
 
 - [Rust toolchain](https://rust-lang.org/tools/install)

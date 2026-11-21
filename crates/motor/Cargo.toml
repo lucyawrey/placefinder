@@ -2,6 +2,7 @@
 name = "motor"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
 parry3d = "0.31"

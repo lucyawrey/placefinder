@@ -1,0 +1,38 @@
+accepted = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Zlib",
+]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+]
+private = { ignore = true }
+
+[check-core.clarify]
+license = "MIT"
+[[check-core.clarify.git]]
+path = "LICENSE"
+checksum = "6c2593c193aa8028e029bec3f352ea53090154f1894d2333423d34f1c3600538"
+
+[check-serde.clarify]
+license = "MIT"
+[[check-serde.clarify.git]]
+path = "LICENSE"
+checksum = "6c2593c193aa8028e029bec3f352ea53090154f1894d2333423d34f1c3600538"
+
+[check-syntax.clarify]
+license = "MIT"
+[[check-syntax.clarify.git]]
+path = "LICENSE"
+checksum = "6c2593c193aa8028e029bec3f352ea53090154f1894d2333423d34f1c3600538"
