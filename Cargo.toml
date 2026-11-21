@@ -1,3 +1,6 @@
 [workspace]
 members = ["crates/place", "crates/client", "crates/server", "crates/motor"]
 resolver = "3"
+
+[profile.release]
+strip = true
