@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Third Party Licenses</title>
+<style>
+body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 0 16px; }
+pre { white-space: pre-wrap; }
+@media (prefers-color-scheme: dark) { body { background: #222; color: #eee; } a { color: skyblue; } }
+</style>
+</head>
+<body>
+<h1>Third Party Licenses</h1>
+<p>[intro saying what this page lists]</p>
+<ul>
+{{#each overview}}<li><a href="#{{id}}">{{name}}</a> ({{count}})</li>
+{{/each}}
+</ul>
+{{#each licenses}}
+<h2 id="{{id}}">{{name}}</h2>
+<ul>
+{{#each used_by}}<li><a href="{{#if crate.repository}}{{crate.repository}}{{else}}https://crates.io/crates/{{crate.name}}{{/if}}">{{crate.name}} {{crate.version}}</a></li>
+{{/each}}
+</ul>
+<pre>{{text}}</pre>
+{{/each}}
+</body>
+</html>

@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            platform: linux-x86_64
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows-x86_64
+            exe: .exe
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            platform: macos-arm64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-${{ matrix.target }}-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: release-${{ matrix.target }}-cargo-
+      - run: cargo build --release -p client -p server
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - run: |
+          for pair in client:placefinder server:placefinder-server; do
+            crate=${pair%%:*} bin=${pair#*:}
+            dir=dist/$bin
+            mkdir -p "$dir"
+            cp "target/release/$bin${{ matrix.exe }}" LICENSE "$dir/"
+            cargo about generate --fail --target ${{ matrix.target }} -m crates/$crate/Cargo.toml about.hbs -o "$dir/THIRD-PARTY-NOTICES.html"
+            zip=$bin-$GITHUB_REF_NAME-${{ matrix.platform }}.zip
+            if [ "$RUNNER_OS" = Windows ]; then
+              (cd "$dir" && 7z a "../../$zip" .)
+            else
+              (cd "$dir" && zip -r "../../$zip" .)
+            fi
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zips-${{ matrix.target }}
+          path: '*.zip'
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: zips-*
+          merge-multiple: true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=
+          case "$GITHUB_REF_NAME" in *-*) prerelease=--prerelease ;; esac
+          gh release create "$GITHUB_REF_NAME" *.zip --repo "$GITHUB_REPOSITORY" --generate-notes $prerelease

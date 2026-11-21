@@ -2,6 +2,11 @@
 name = "server"
 version = "0.1.0"
 edition = "2024"
+publish = false
+
+[[bin]]
+name = "placefinder-server"
+path = "src/main.rs"
 
 [dependencies]
 axum = "0.8.9"

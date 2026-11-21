@@ -2,6 +2,7 @@
 name = "place"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
 check-core = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
