@@ -10,6 +10,7 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: ubuntu-22.04
@@ -55,6 +56,10 @@ jobs:
           NO_STRIP: true
         run: |
           cargo about generate --fail --target ${{ matrix.target }} -m crates/client/Cargo.toml about.hbs -o target/release/THIRD-PARTY-NOTICES.html
+          if [ "$RUNNER_OS" = macOS ]; then
+            # cargo-packager's .icns has no 1024px size except 512@2x, which it only picks from an "@2x" file name.
+            sips -Z 512 crates/client/icons/icon.png
+          fi
           cargo packager --release -p client -f ${{ matrix.format }}
           name=placefinder-$GITHUB_REF_NAME-${{ matrix.platform }}
           case "$RUNNER_OS" in
