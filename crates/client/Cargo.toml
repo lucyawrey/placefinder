@@ -28,5 +28,9 @@ binaries = [{ path = "placefinder", main = true }]
 icons = ["icons/icon.png"]
 resources = ["../../LICENSE", "../../target/release/THIRD-PARTY-NOTICES.html"]
 
+[package.metadata.packager.appimage]
+# The build machine's libwayland-client stops newer hosts' Vulkan drivers from finding the GPU.
+excluded-libraries = ["libwayland-client*"]
+
 [package.metadata.packager.nsis]
 installer-icon = "icons/icon.ico"
