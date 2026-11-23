@@ -4,10 +4,12 @@ An experimental new type of web browser for 3D experiences.
 
 ## Download
 
-Builds of the client (`placefinder`) and server (`placefinder-server`) for Linux (x86_64), Windows (x86_64) and macOS (Apple Silicon) are on the [Releases](https://github.com/lucyawrey/placefinder/releases) page. They take the same arguments as the `cargo run` commands below.
+Builds for Linux (x86_64), Windows (x86_64) and macOS (Apple Silicon) are on the [Releases](https://github.com/lucyawrey/placefinder/releases) page. The client comes as an AppImage on Linux, a `.dmg` on macOS and an installer on Windows. The server (`placefinder-server`) is a zip per platform. Both take the same arguments as the `cargo run` commands below.
 
-- **Linux:** needs ALSA, udev, Wayland and xkbcommon, which most desktops already have.
-- **macOS:** the builds aren't signed, so macOS blocks them at first. Allow them with `xattr -d com.apple.quarantine placefinder` (or `placefinder-server`) in the unzipped folder.
+- **Linux:** the AppImage needs ALSA, xkbcommon and libwayland-client, which most desktops already have. Make it executable (`chmod +x`) and run it.
+- **macOS:** the builds aren't signed, so macOS blocks them at first. After dragging Placefinder to Applications, allow it with `xattr -dr com.apple.quarantine /Applications/Placefinder.app` (for the server, `xattr -d com.apple.quarantine placefinder-server` in the unzipped folder).
+- **Windows:** the installer isn't signed, so SmartScreen warns about it: choose "More info", then "Run anyway".
+- **Logs:** the client writes its log to `~/.local/state/placefinder/placefinder.log` on Linux (under `$XDG_STATE_HOME` if set), `~/Library/Logs/Placefinder/placefinder.log` on macOS and `%LOCALAPPDATA%\Placefinder\logs\placefinder.log` on Windows, replacing it each run.
 
 ## Requirements
 

@@ -17,3 +17,22 @@ motor = { version = "0.1.0", path = "../motor" }
 place = { version = "0.1.0", path = "../place" }
 rmcp = { version = "3.11.0", features = ["transport-streamable-http-server"] }
 tokio = { version = "1.54.1", features = ["rt", "net", "sync", "time"] }
+
+[build-dependencies]
+winresource = "0.1.34"
+
+[package.metadata.packager]
+product-name = "Placefinder"
+identifier = "dev.placefinder.client"
+binaries = [{ path = "placefinder", main = true }]
+icons = ["icons/icon.png"]
+resources = ["../../LICENSE", "../../target/release/THIRD-PARTY-NOTICES.html"]
+
+[package.metadata.packager.appimage]
+# The build machine's libwayland-client stops newer hosts' Vulkan drivers from finding the GPU.
+excluded-libraries = ["libwayland-client*"]
+
+[package.metadata.packager.nsis]
+installer-icon = "icons/icon.ico"
+# The log folder sits inside the per-user install folder, which the uninstaller otherwise leaves behind.
+appdata-paths = ["$LOCALAPPDATA/$PRODUCTNAME"]

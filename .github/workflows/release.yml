@@ -10,18 +10,22 @@ permissions:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             platform: linux-x86_64
+            format: appimage
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             platform: windows-x86_64
             exe: .exe
+            format: nsis
           - runner: macos-latest
             target: aarch64-apple-darwin
             platform: macos-arm64
+            format: app
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -33,25 +37,52 @@ jobs:
       - run: cargo build --release --locked -p client -p server
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-about
-      - run: |
-          for pair in client:placefinder server:placefinder-server; do
-            crate=${pair%%:*} bin=${pair#*:}
-            dir=dist/$bin
-            mkdir -p "$dir"
-            cp "target/release/$bin${{ matrix.exe }}" LICENSE "$dir/"
-            cargo about generate --fail --target ${{ matrix.target }} -m crates/$crate/Cargo.toml about.hbs -o "$dir/THIRD-PARTY-NOTICES.html"
-            zip=$bin-$GITHUB_REF_NAME-${{ matrix.platform }}.zip
-            if [ "$RUNNER_OS" = Windows ]; then
-              (cd "$dir" && 7z a "../../$zip" .)
-            else
-              (cd "$dir" && zip -r "../../$zip" .)
-            fi
-          done
+          tool: cargo-about,cargo-packager@0.11.8
+      - name: Zip the server
+        run: |
+          dir=dist/placefinder-server
+          mkdir -p "$dir"
+          cp "target/release/placefinder-server${{ matrix.exe }}" LICENSE "$dir/"
+          cargo about generate --fail --target ${{ matrix.target }} -m crates/server/Cargo.toml about.hbs -o "$dir/THIRD-PARTY-NOTICES.html"
+          zip=placefinder-server-$GITHUB_REF_NAME-${{ matrix.platform }}.zip
+          if [ "$RUNNER_OS" = Windows ]; then
+            (cd "$dir" && 7z a "../../$zip" .)
+          else
+            (cd "$dir" && zip -r "../../$zip" .)
+          fi
+      - name: Package the client
+        env:
+          # linuxdeploy's own strip can't read some newer libraries; the binary is already stripped.
+          NO_STRIP: true
+        run: |
+          cargo about generate --fail --target ${{ matrix.target }} -m crates/client/Cargo.toml about.hbs -o target/release/THIRD-PARTY-NOTICES.html
+          if [ "$RUNNER_OS" = macOS ]; then
+            # cargo-packager's .icns has no 1024px size except 512@2x, which it only picks from an "@2x" file name.
+            sips -Z 512 crates/client/icons/icon.png
+          fi
+          cargo packager --release -p client -f ${{ matrix.format }}
+          name=placefinder-$GITHUB_REF_NAME-${{ matrix.platform }}
+          case "$RUNNER_OS" in
+            Linux) mv target/release/placefinder_*_x86_64.AppImage "$name.AppImage" ;;
+            Windows) mv target/release/placefinder_*_x64-setup.exe "$name-setup.exe" ;;
+            macOS)
+              # cargo-packager signs only with a real identity; Apple Silicon needs at least an ad-hoc signature.
+              codesign --force --deep -s - target/release/Placefinder.app
+              mkdir dmg
+              mv target/release/Placefinder.app dmg/
+              ln -s /Applications dmg/Applications
+              hdiutil create -volname Placefinder -srcfolder dmg -format UDZO "$name.dmg"
+              ;;
+          esac
       - uses: actions/upload-artifact@v4
         with:
-          name: zips-${{ matrix.target }}
-          path: '*.zip'
+          name: packages-${{ matrix.target }}
+          path: |
+            *.zip
+            *.AppImage
+            *.dmg
+            *-setup.exe
+          if-no-files-found: error
 
   release:
     needs: build
@@ -61,11 +92,17 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: zips-*
+          pattern: packages-*
           merge-multiple: true
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          prerelease=
-          case "$GITHUB_REF_NAME" in *-*) prerelease=--prerelease ;; esac
-          gh release create "$GITHUB_REF_NAME" *.zip --repo "$GITHUB_REPOSITORY" --generate-notes $prerelease
+          files=(*.zip *.AppImage *.dmg *-setup.exe)
+          # A release made on the website already exists, with its own notes, when its tag starts this run.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            prerelease=
+            case "$GITHUB_REF_NAME" in *-*) prerelease=--prerelease ;; esac
+            gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --generate-notes $prerelease
+          fi
