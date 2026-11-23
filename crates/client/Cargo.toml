@@ -34,3 +34,5 @@ excluded-libraries = ["libwayland-client*"]
 
 [package.metadata.packager.nsis]
 installer-icon = "icons/icon.ico"
+# The log folder sits inside the per-user install folder, which the uninstaller otherwise leaves behind.
+appdata-paths = ["$LOCALAPPDATA/$PRODUCTNAME"]
