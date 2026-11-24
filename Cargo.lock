@@ -2286,15 +2286,18 @@ dependencies = [
 
 [[package]]
 name = "client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "base64",
  "bevy",
+ "check-core",
+ "check-serde",
  "image",
  "motor",
  "place",
  "rmcp",
+ "serde",
  "tokio",
  "winresource",
 ]

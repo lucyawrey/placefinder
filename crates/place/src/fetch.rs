@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::Text;
 use crate::address::{Base, normalize};
 
 #[derive(Debug)]
@@ -12,8 +13,10 @@ pub enum FetchError {
 impl fmt::Display for FetchError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            FetchError::OutsidePlace(p) => write!(f, "[a file path outside the Place: {p}]"),
-            FetchError::NotFound(p) => write!(f, "[a file that wasn't found: {p}]"),
+            FetchError::OutsidePlace(p) => {
+                f.write_str(&Text::file_outside_place.fill(&[("path", p)]))
+            }
+            FetchError::NotFound(p) => f.write_str(&Text::file_not_found.fill(&[("path", p)])),
             FetchError::Failed(e) => write!(f, "{e}"),
         }
     }

@@ -4,6 +4,8 @@ use std::fmt;
 use check_core::modules::MemFiles;
 use serde::{Deserialize, Serialize};
 
+use crate::Text;
+
 /// The manifest version this client reads.
 pub const VERSION: i64 = 0;
 
@@ -19,6 +21,8 @@ pub struct Manifest {
     pub scene: String,
     pub spawn: Point,
     pub portals: Vec<Portal>,
+    /// Whether clicking the scene captures the mouse, for looking around and walking.
+    pub capture_mouse: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -39,10 +43,8 @@ impl fmt::Display for ManifestError {
         match self {
             ManifestError::Invalid(e) => write!(f, "{e}"),
             ManifestError::Version(v) => {
-                write!(
-                    f,
-                    "[a manifest version this client doesn't read: {v}, reads {VERSION}]"
-                )
+                let slots: [(&str, &dyn fmt::Display); 2] = [("version", v), ("reads", &VERSION)];
+                f.write_str(&Text::unknown_manifest_version.fill(&slots))
             }
         }
     }

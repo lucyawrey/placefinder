@@ -1,6 +1,6 @@
 [package]
 name = "client"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 publish = false
 
@@ -11,11 +11,14 @@ path = "src/main.rs"
 [dependencies]
 axum = "0.8.9"
 base64 = "0.23.1"
-bevy = "0.20.1"
+bevy = { version = "0.20.1", features = ["system_clipboard"] }
+check-core = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
+check-serde = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 motor = { version = "0.1.0", path = "../motor" }
 place = { version = "0.1.0", path = "../place" }
 rmcp = { version = "3.11.0", features = ["transport-streamable-http-server"] }
+serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.54.1", features = ["rt", "net", "sync", "time"] }
 
 [build-dependencies]

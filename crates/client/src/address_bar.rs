@@ -1,6 +1,7 @@
-use bevy::input_focus::{FocusCause, InputFocus};
+use bevy::input_focus::InputFocus;
+use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
-use bevy::text::{EditableText, LineBreak, TextEdit};
+use bevy::text::{EditableText, LineBreak, TextCursorStyle, TextEdit};
 use bevy::ui_widgets::{Activate, Button, SelectAllOnFocus, TextInput};
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
@@ -46,7 +47,12 @@ fn spawn(mut commands: Commands) {
             (
                 Field,
                 TextInput,
+                TabIndex(0),
                 SelectAllOnFocus,
+                TextCursorStyle {
+                    color: Color::srgb(0.9, 0.9, 0.95),
+                    ..default()
+                },
                 TextLayout {
                     linebreak: LineBreak::NoWrap,
                     ..default()
@@ -78,7 +84,7 @@ fn spawn(mut commands: Commands) {
                     ..default()
                 },
                 BackgroundColor(Color::srgb(0.25, 0.35, 0.6)),
-                children![Text::new("Submit")]
+                children![Text::new(place::Text::go_button.get())]
             ),
             (
                 StatusText,
@@ -106,9 +112,14 @@ fn show_status(
         return;
     }
     let (entity, editable) = &mut *field;
-    if let (Some(current), false) = (&status.current, focus.get() == Some(*entity)) {
+    // Before any Place has loaded, the address being loaded stays shown, even after it fails.
+    let shown = match &status.current {
+        Some(current) => Some(current.address.to_string()),
+        None => status.loading.clone(),
+    };
+    if let (Some(address), false) = (shown, focus.get() == Some(*entity)) {
         editable.queue_edit(TextEdit::SelectAll);
-        editable.queue_edit(TextEdit::Insert(current.address.to_string().into()));
+        editable.queue_edit(TextEdit::Insert(address.into()));
     }
     **spinner = if status.loading.is_some() {
         Visibility::Inherited
@@ -116,9 +127,7 @@ fn show_status(
         Visibility::Hidden
     };
     text.0 = match &status.error {
-        Some(reason) => {
-            format!("[error shown when a Place fails to load, with the reason] {reason}")
-        }
+        Some(reason) => place::Text::load_failed.fill(&[("reason", reason)]),
         None => String::new(),
     };
 }
@@ -156,25 +165,30 @@ fn go(
     }
 }
 
-/// Clicking the scene captures the mouse for looking around; clicking the bar or pressing
-/// Escape releases it, so typing doesn't move the player.
+/// In a Place whose manifest asks for it, clicking the scene captures the mouse for looking
+/// around; clicking the bar or pressing Escape releases it, so typing doesn't move the player.
 fn grab_cursor(
+    status: Res<Status>,
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     mut focus: ResMut<InputFocus>,
-    field: Single<Entity, With<Field>>,
     window: Single<(&Window, &mut CursorOptions), With<PrimaryWindow>>,
 ) {
     let (window, mut cursor) = window.into_inner();
     let in_bar = window.cursor_position().is_some_and(|p| p.y < HEIGHT);
     let clicked_bar = mouse.just_pressed(MouseButton::Left) && in_bar;
-    if keys.just_pressed(KeyCode::Escape) || clicked_bar {
+    let allowed = status
+        .current
+        .as_ref()
+        .is_some_and(|c| c.manifest.capture_mouse);
+    let disallowed = !allowed && cursor.grab_mode != CursorGrabMode::None;
+    if keys.just_pressed(KeyCode::Escape) || clicked_bar || disallowed {
         cursor.grab_mode = CursorGrabMode::None;
         cursor.visible = true;
-        if clicked_bar {
-            focus.set(*field, FocusCause::Pressed);
-        }
-    } else if mouse.just_pressed(MouseButton::Left) && cursor.grab_mode == CursorGrabMode::None {
+    } else if allowed
+        && mouse.just_pressed(MouseButton::Left)
+        && cursor.grab_mode == CursorGrabMode::None
+    {
         focus.clear();
         cursor.grab_mode = CursorGrabMode::Locked;
         cursor.visible = false;

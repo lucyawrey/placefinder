@@ -24,14 +24,16 @@ fn temp_place(name: &str, files: &[(&str, &str)]) -> Address {
 }
 
 #[test]
-fn examples_load_and_their_portals_lead_to_each_other() {
-    let (garden, meadow) = (example("garden"), example("meadow"));
-    let (_, garden_manifest) = load(&garden).unwrap();
-    let (_, meadow_manifest) = load(&meadow).unwrap();
-    let to_meadow = garden.resolve(&garden_manifest.portals[0].target).unwrap();
-    let to_garden = meadow.resolve(&meadow_manifest.portals[0].target).unwrap();
-    assert_eq!(load(&to_meadow).unwrap().1, meadow_manifest);
-    assert_eq!(load(&to_garden).unwrap().1, garden_manifest);
+fn every_example_portal_leads_to_a_place_that_loads() {
+    for name in ["", "meadow", "collision-test"] {
+        let place = example(name);
+        let (_, manifest) = load(&place).unwrap();
+        assert!(!manifest.portals.is_empty(), "{name:?} has no portals");
+        for portal in &manifest.portals {
+            let target = place.resolve(&portal.target).unwrap();
+            assert!(load(&target).is_ok(), "{name:?} → {}", portal.target);
+        }
+    }
 }
 
 #[test]
@@ -64,7 +66,7 @@ fn an_unknown_manifest_version_is_refused() {
 
 #[test]
 fn refuses_files_outside_the_place_on_every_platform() {
-    let base = example("garden").base();
+    let base = example("").base();
     for path in ["../../x.gltf", "..\\..\\x.gltf", "C:/x.gltf", "a/C:x.gltf"] {
         assert!(
             matches!(base.fetch(path), Err(FetchError::OutsidePlace(_))),

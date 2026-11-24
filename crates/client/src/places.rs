@@ -170,10 +170,7 @@ fn finish_travel(
             fail(
                 &mut status,
                 failed.unwrap_or_else(|| {
-                    format!(
-                        "[a scene file with no scene in it: {}]",
-                        place.manifest.scene
-                    )
+                    place::Text::scene_without_scene.fill(&[("scene", &place.manifest.scene)])
                 }),
             );
             continue;
@@ -304,7 +301,7 @@ pub(crate) mod tests {
     #[test]
     fn loads_gltf_and_glb_places() {
         let mut app = app();
-        for name in ["garden", "meadow"] {
+        for name in ["", "meadow"] {
             travel(&mut app, &example(name));
             assert_eq!(app.world().resource::<Status>().error, None);
             assert_eq!(current(&app), example(name));
@@ -320,11 +317,11 @@ pub(crate) mod tests {
             temp_place("empty", &[]),
         ];
         let mut app = app();
-        travel(&mut app, &example("garden"));
+        travel(&mut app, &example(""));
         for target in &failing {
             travel(&mut app, target);
             assert!(app.world().resource::<Status>().error.is_some(), "{target}");
-            assert_eq!(current(&app), example("garden"));
+            assert_eq!(current(&app), example(""));
         }
     }
 }
