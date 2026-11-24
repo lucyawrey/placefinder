@@ -1,4 +1,5 @@
-use bevy::input_focus::{FocusCause, InputFocus};
+use bevy::input_focus::InputFocus;
+use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::prelude::*;
 use bevy::text::{EditableText, LineBreak, TextCursorStyle, TextEdit};
 use bevy::ui_widgets::{Activate, Button, SelectAllOnFocus, TextInput};
@@ -46,6 +47,7 @@ fn spawn(mut commands: Commands) {
             (
                 Field,
                 TextInput,
+                TabIndex(0),
                 SelectAllOnFocus,
                 TextCursorStyle {
                     color: Color::srgb(0.9, 0.9, 0.95),
@@ -170,7 +172,6 @@ fn grab_cursor(
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     mut focus: ResMut<InputFocus>,
-    field: Single<Entity, With<Field>>,
     window: Single<(&Window, &mut CursorOptions), With<PrimaryWindow>>,
 ) {
     let (window, mut cursor) = window.into_inner();
@@ -184,9 +185,6 @@ fn grab_cursor(
     if keys.just_pressed(KeyCode::Escape) || clicked_bar || disallowed {
         cursor.grab_mode = CursorGrabMode::None;
         cursor.visible = true;
-        if clicked_bar {
-            focus.set(*field, FocusCause::Pressed);
-        }
     } else if allowed
         && mouse.just_pressed(MouseButton::Left)
         && cursor.grab_mode == CursorGrabMode::None
