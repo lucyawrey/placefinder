@@ -66,7 +66,7 @@ impl Shapes {
     }
 
     fn world(self) -> World {
-        World::new(self.vertices, self.triangles)
+        World::new([(self.vertices, self.triangles)])
     }
 }
 
@@ -310,4 +310,36 @@ fn respawns_after_falling_past_the_depth() {
         state = next;
     }
     assert!(respawned, "{state:?}");
+}
+
+#[test]
+fn stands_on_a_small_dense_mesh() {
+    // A ball of 0.4 m radius resting on the floor, in 2,048 triangles.
+    let (rings, segments) = (32, 32);
+    let point = |ring: u32, segment: u32| {
+        let (theta, phi) = (
+            std::f32::consts::PI * ring as f32 / rings as f32,
+            std::f32::consts::TAU * segment as f32 / segments as f32,
+        );
+        Vec3::new(theta.sin() * phi.cos(), theta.cos(), theta.sin() * phi.sin()) * 0.4
+            + Vec3::new(0.0, 0.4, 0.0)
+    };
+    let mut points = Vec::new();
+    let mut triangles = Vec::new();
+    for ring in 0..rings {
+        for segment in 0..segments {
+            let first = points.len() as u32;
+            points.extend([
+                point(ring, segment),
+                point(ring + 1, segment),
+                point(ring + 1, segment + 1),
+                point(ring, segment + 1),
+            ]);
+            triangles.extend([[first, first + 1, first + 2], [first, first + 2, first + 3]]);
+        }
+    }
+    let floor = Shapes::default().floor(0.0, 4);
+    let world = World::new([(floor.vertices, floor.triangles), (points, triangles)]);
+    let state = settle(&world, State::at(Vec3::new(0.0, 2.0, 0.0)));
+    assert!((state.feet.y - 0.8).abs() < 0.05, "{state:?}");
 }
