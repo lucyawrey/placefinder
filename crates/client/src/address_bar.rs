@@ -1,6 +1,6 @@
 use bevy::input_focus::{FocusCause, InputFocus};
 use bevy::prelude::*;
-use bevy::text::{EditableText, LineBreak, TextEdit};
+use bevy::text::{EditableText, LineBreak, TextCursorStyle, TextEdit};
 use bevy::ui_widgets::{Activate, Button, SelectAllOnFocus, TextInput};
 use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 
@@ -47,6 +47,10 @@ fn spawn(mut commands: Commands) {
                 Field,
                 TextInput,
                 SelectAllOnFocus,
+                TextCursorStyle {
+                    color: Color::srgb(0.9, 0.9, 0.95),
+                    ..default()
+                },
                 TextLayout {
                     linebreak: LineBreak::NoWrap,
                     ..default()
