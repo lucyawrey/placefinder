@@ -82,7 +82,7 @@ fn spawn(mut commands: Commands) {
                     ..default()
                 },
                 BackgroundColor(Color::srgb(0.25, 0.35, 0.6)),
-                children![Text::new("Submit")]
+                children![Text::new(place::Text::go_button.get())]
             ),
             (
                 StatusText,

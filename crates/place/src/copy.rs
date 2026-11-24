@@ -37,6 +37,7 @@ texts! {
     not_a_place,
     unknown_manifest_version,
     scene_without_scene,
+    go_button,
     load_failed,
     port_too_large,
     mcp_listen_failed,
