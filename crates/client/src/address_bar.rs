@@ -159,9 +159,10 @@ fn go(
     }
 }
 
-/// Clicking the scene captures the mouse for looking around; clicking the bar or pressing
-/// Escape releases it, so typing doesn't move the player.
+/// In a Place whose manifest asks for it, clicking the scene captures the mouse for looking
+/// around; clicking the bar or pressing Escape releases it, so typing doesn't move the player.
 fn grab_cursor(
+    status: Res<Status>,
     mouse: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
     mut focus: ResMut<InputFocus>,
@@ -171,13 +172,21 @@ fn grab_cursor(
     let (window, mut cursor) = window.into_inner();
     let in_bar = window.cursor_position().is_some_and(|p| p.y < HEIGHT);
     let clicked_bar = mouse.just_pressed(MouseButton::Left) && in_bar;
-    if keys.just_pressed(KeyCode::Escape) || clicked_bar {
+    let allowed = status
+        .current
+        .as_ref()
+        .is_some_and(|c| c.manifest.capture_mouse);
+    let disallowed = !allowed && cursor.grab_mode != CursorGrabMode::None;
+    if keys.just_pressed(KeyCode::Escape) || clicked_bar || disallowed {
         cursor.grab_mode = CursorGrabMode::None;
         cursor.visible = true;
         if clicked_bar {
             focus.set(*field, FocusCause::Pressed);
         }
-    } else if mouse.just_pressed(MouseButton::Left) && cursor.grab_mode == CursorGrabMode::None {
+    } else if allowed
+        && mouse.just_pressed(MouseButton::Left)
+        && cursor.grab_mode == CursorGrabMode::None
+    {
         focus.clear();
         cursor.grab_mode = CursorGrabMode::Locked;
         cursor.visible = false;

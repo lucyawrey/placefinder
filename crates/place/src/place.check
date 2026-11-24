@@ -8,4 +8,5 @@ class Place {
   let scene: String
   let spawn: (Float, Float, Float)
   let portals: Portal[] = []
+  let capture_mouse: Bool = false
 }

@@ -21,6 +21,8 @@ pub struct Manifest {
     pub scene: String,
     pub spawn: Point,
     pub portals: Vec<Portal>,
+    /// Whether clicking the scene captures the mouse, for looking around and walking.
+    pub capture_mouse: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
