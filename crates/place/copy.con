@@ -1,5 +1,5 @@
 // Addresses
-empty_address = "[an empty address]"
+empty_address = "Empty address"
 address_without_host = "[an address with no host]"
 bad_port = "[a port that isn't a number: {port}]"
 above_root = "[a path that goes above the site's root]"
