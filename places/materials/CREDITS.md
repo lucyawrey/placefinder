@@ -1,6 +1,6 @@
 # Credits
 
-These test Places use models from the [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets), unchanged. Each folder's `LICENSE.md` is the model's license file.
+These test Places use models from the [Khronos glTF Sample Assets](https://github.com/KhronosGroup/glTF-Sample-Assets), each with a grey floor node and material added. Each folder's `LICENSE.md` is the model's license file and covers the model, not the added floor or `place.con`.
 
 | Folder | Model | By | License |
 | --- | --- | --- | --- |

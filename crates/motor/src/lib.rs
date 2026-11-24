@@ -1,7 +1,6 @@
 use parry3d::math::{Pose, Vector};
 use parry3d::query::{self, PointQuery, Ray, RayCast, ShapeCastOptions};
 use parry3d::shape::{Capsule, Compound, Shape, SharedShape, TriMesh, TriMeshFlags};
-use parry3d::transformation::convex_hull;
 
 pub use parry3d::math::Vector as Vec3;
 
@@ -49,7 +48,6 @@ impl Default for Settings {
 
 /// What the player collides with, in world space: triangles, and convex hulls standing in for
 /// small, dense meshes.
-#[derive(Default)]
 pub struct World {
     mesh: Option<TriMesh>,
     hulls: Option<Compound>,
@@ -86,7 +84,8 @@ impl World {
     }
 }
 
-/// A simplified convex hull standing in for a small mesh of more than `DENSE` triangles.
+/// A simplified convex hull standing in for a small mesh of more than `DENSE` triangles, or `None`
+/// to keep its triangles, as for a mesh collapsed to a point.
 fn hull(points: &[Vec3], triangles: usize) -> Option<SharedShape> {
     let (min, max) = points
         .iter()
@@ -94,10 +93,21 @@ fn hull(points: &[Vec3], triangles: usize) -> Option<SharedShape> {
     if triangles <= DENSE || (max - min).max_element() >= SMALL {
         return None;
     }
-    let (hull, _) = convex_hull(points);
-    let stride = hull.len().div_ceil(HULL_POINTS);
-    let sample: Vec<Vec3> = hull.into_iter().step_by(stride).collect();
-    SharedShape::convex_hull(&sample)
+    // The farthest point in each of `HULL_POINTS` directions spread evenly over a sphere.
+    let golden = std::f32::consts::PI * (3.0 - 5f32.sqrt());
+    let extremes: Vec<Vec3> = (0..HULL_POINTS)
+        .map(|i| {
+            let y = 1.0 - 2.0 * (i as f32 + 0.5) / HULL_POINTS as f32;
+            let (sin, cos) = (golden * i as f32).sin_cos();
+            let ring = (1.0 - y * y).sqrt();
+            let direction = Vec3::new(ring * cos, y, ring * sin);
+            *points
+                .iter()
+                .max_by(|a, b| a.dot(direction).total_cmp(&b.dot(direction)))
+                .expect("a dense mesh has points")
+        })
+        .collect();
+    SharedShape::convex_hull(&extremes)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
