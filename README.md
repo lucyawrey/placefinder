@@ -23,6 +23,12 @@ cargo build
 
 ## Run
 
+Started without an address, the client opens the home Place, by default the example Places hosted at `place://lucyawrey.github.io/placefinder`. To use another home, set `home = "<address>"` in `settings.con` in the config folder: `~/.config/placefinder/` on Linux, `~/Library/Application Support/Placefinder/` on macOS, `%APPDATA%\Placefinder\` on Windows.
+
+```
+cargo run -p client
+```
+
 Open a Place from a folder directly:
 
 ```
