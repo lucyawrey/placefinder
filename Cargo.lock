@@ -2291,10 +2291,13 @@ dependencies = [
  "axum",
  "base64",
  "bevy",
+ "check-core",
+ "check-serde",
  "image",
  "motor",
  "place",
  "rmcp",
+ "serde",
  "tokio",
  "winresource",
 ]

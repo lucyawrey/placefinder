@@ -1,0 +1,5 @@
+namespace settings
+
+class Settings {
+  let home: String? = None
+}

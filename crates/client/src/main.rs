@@ -3,19 +3,21 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod address_bar;
+mod folders;
 mod log_file;
 mod mcp;
 mod places;
 mod player;
 mod portals;
+mod settings;
 mod source;
 
 use bevy::asset::AssetMetaCheck;
 use bevy::log::{DEFAULT_FILTER, LogPlugin};
 use bevy::prelude::*;
 
-/// `client [--mcp [port]] [address]`: opens the Placefinder prototype, at the address if one is
-/// given, serving the developer MCP if `--mcp` is.
+/// `client [--mcp [port]] [address]`: opens the Placefinder prototype at the address if one is
+/// given, else at the home Place, serving the developer MCP if `--mcp` is.
 fn main() {
     #[cfg(all(windows, not(debug_assertions)))]
     attach_console();
@@ -70,12 +72,12 @@ fn main() {
     if let Some(port) = mcp_port {
         app.add_plugins(mcp::McpPlugin { port });
     }
-    if let Some(address) = address {
-        app.world_mut().write_message(places::Travel {
-            target: address,
-            from_portal: false,
-        });
-    }
+    // After `LogPlugin`, so a broken settings file is logged.
+    let target = address.unwrap_or_else(settings::home);
+    app.world_mut().write_message(places::Travel {
+        target,
+        from_portal: false,
+    });
     app.run();
 }
 
