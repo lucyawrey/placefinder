@@ -9,4 +9,5 @@ class Place {
   let spawn: (Float, Float, Float)
   let portals: Portal[] = []
   let capture_mouse: Bool = false
+  let environment_light: Bool = true
 }

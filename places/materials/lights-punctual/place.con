@@ -1,0 +1,6 @@
+version = 0
+name = "Punctual lights"
+scene = "scene.glb"
+capture_mouse = true
+spawn = (0.25, 0.0, 2.6)
+portals = [(target = "../..", center = (0.25, 1.0, 5.6), size = (1.5, 2.0, 0.3))]

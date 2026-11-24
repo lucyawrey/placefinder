@@ -1,5 +1,5 @@
 use bevy::asset::{LoadState, RecursiveDependencyLoadState};
-use bevy::gltf::Gltf;
+use bevy::gltf::{Gltf, GltfLoaderSettings};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
 use bevy::world_serialization::WorldAssetRoot;
@@ -133,7 +133,10 @@ fn fetch_manifest(
                 commands.spawn(Pending {
                     address,
                     number: *next_number,
-                    gltf: assets.load(path),
+                    gltf: assets
+                        .load_builder()
+                        .with_settings(|s: &mut GltfLoaderSettings| s.load_cameras = false)
+                        .load(path),
                     manifest,
                 });
             }

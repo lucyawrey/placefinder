@@ -1,5 +1,9 @@
+use bevy::camera::Hdr;
 use bevy::input::mouse::AccumulatedMouseMotion;
+use bevy::light::atmosphere::ScatteringMedium;
+use bevy::light::{Atmosphere, AtmosphereEnvironmentMapLight, GeneratedEnvironmentMapLight};
 use bevy::mesh::PrimitiveTopology;
+use bevy::pbr::AtmosphereSettings;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
@@ -52,11 +56,22 @@ enum Collision {
     Built(Box<motor::World>),
 }
 
+#[derive(Component)]
+struct Eye;
+
+/// The default sky, which lights the scene and shows behind it.
+pub fn sky() -> impl Bundle {
+    (
+        AtmosphereSettings::default(),
+        AtmosphereEnvironmentMapLight::default(),
+    )
+}
+
 /// The camera's height above the feet.
 const EYE: f32 = 1.6;
 const SENSITIVITY: f32 = 0.002;
 
-fn spawn(mut commands: Commands) {
+fn spawn(mut commands: Commands, mut media: ResMut<Assets<ScatteringMedium>>) {
     commands
         .spawn((
             Player {
@@ -69,19 +84,28 @@ fn spawn(mut commands: Commands) {
             Transform::default(),
             Visibility::default(),
         ))
-        .with_child((Camera3d::default(), Transform::from_xyz(0.0, EYE, 0.0)));
-    commands.spawn((
-        DirectionalLight::default(),
-        Transform::from_xyz(2.0, 6.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+        .with_child((Eye, Camera3d::default(), Transform::from_xyz(0.0, EYE, 0.0)));
+    commands.spawn(Atmosphere::earth(media.add(ScatteringMedium::earth(256, 256))));
 }
 
 fn place_at_spawn(
     mut arrived: MessageReader<Arrived>,
     mut player: Single<(&mut Transform, &mut Player)>,
     mut collision: ResMut<Collision>,
+    eye: Single<Entity, With<Eye>>,
+    mut commands: Commands,
 ) {
     if let Some(arrived) = arrived.read().last() {
+        if arrived.manifest.environment_light {
+            commands.entity(*eye).insert(sky());
+        } else {
+            commands.entity(*eye).remove::<(
+                AtmosphereSettings,
+                AtmosphereEnvironmentMapLight,
+                GeneratedEnvironmentMapLight,
+                Hdr,
+            )>();
+        }
         let spawn = Vec3::from_array(arrived.manifest.spawn.map(|v| v as f32));
         player.0.translation = spawn;
         player.1.state = State::at(spawn);
@@ -90,15 +114,28 @@ fn place_at_spawn(
     }
 }
 
+/// Lights a scene that brings no lights of its own with a sun, which leaves with the Place.
 fn scene_ready(
     ready: On<WorldInstanceReady>,
     status: Res<Status>,
     parents: Query<&ChildOf>,
+    children: Query<&Children>,
+    lights: Query<(), Or<(With<DirectionalLight>, With<PointLight>, With<SpotLight>)>>,
     mut collision: ResMut<Collision>,
+    mut commands: Commands,
 ) {
-    let current = status.current.as_ref().map(|c| c.root);
-    if parents.get(ready.entity).ok().map(|p| p.parent()) == current {
-        *collision = Collision::Spawned;
+    let Some(root) = status.current.as_ref().map(|c| c.root) else {
+        return;
+    };
+    if parents.get(ready.entity).ok().map(|p| p.parent()) != Some(root) {
+        return;
+    }
+    *collision = Collision::Spawned;
+    if !children.iter_descendants(ready.entity).any(|e| lights.contains(e)) {
+        commands.entity(root).with_child((
+            DirectionalLight::default(),
+            Transform::from_xyz(2.0, 6.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ));
     }
 }
 

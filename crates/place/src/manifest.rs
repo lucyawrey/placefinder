@@ -23,6 +23,8 @@ pub struct Manifest {
     pub portals: Vec<Portal>,
     /// Whether clicking the scene captures the mouse, for looking around and walking.
     pub capture_mouse: bool,
+    /// Whether the default sky lights the scene and shows behind it.
+    pub environment_light: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
