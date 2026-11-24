@@ -106,8 +106,8 @@ mod tests {
 
     #[tokio::test]
     async fn loads_a_place_over_http() {
-        let (_, manifest) = load_served(examples(), "garden").await.unwrap();
-        assert_eq!(manifest.name, "Garden");
+        let (_, manifest) = load_served(examples(), "").await.unwrap();
+        assert_eq!(manifest.name, "Home");
     }
 
     #[tokio::test]

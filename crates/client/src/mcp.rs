@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn a_load_replaced_by_another_travel_says_so() {
         let (mut app, port) = mcp_app();
-        let garden = example("garden");
+        let home = example("");
         let replaced = call_each_frame(
             &mut app,
             port,
@@ -563,7 +563,7 @@ mod tests {
                     .is_some_and(|l| l.contains("meadow"))
                 {
                     app.world_mut().write_message(Travel {
-                        target: garden.clone(),
+                        target: home.clone(),
                         from_portal: false,
                     });
                 }
@@ -582,13 +582,13 @@ mod tests {
             &mut app,
             port,
             "load_place",
-            json!({ "address": example("garden") }),
+            json!({ "address": example("") }),
         );
         let scene = call(&mut app, port, "inspect_scene", json!({}));
         let scene = &scene["structuredContent"];
         assert_eq!(scene["address"], current(&app));
-        assert_eq!(scene["manifest"]["name"], "Garden");
-        assert_eq!(scene["manifest"]["portals"][0]["target"], "../meadow");
+        assert_eq!(scene["manifest"]["name"], "Home");
+        assert_eq!(scene["manifest"]["portals"][0]["target"], "meadow");
         let names: Vec<&str> = scene["nodes"]
             .as_array()
             .unwrap()
