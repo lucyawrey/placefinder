@@ -1,5 +1,6 @@
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::mesh::PrimitiveTopology;
+use bevy::pbr::ScreenSpaceTransmission;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
@@ -73,7 +74,12 @@ fn spawn(mut commands: Commands) {
             Transform::default(),
             Visibility::default(),
         ))
-        .with_child((Eye, Camera3d::default(), Transform::from_xyz(0.0, EYE, 0.0)));
+        .with_child((
+            Eye,
+            Camera3d::default(),
+            ScreenSpaceTransmission::default(),
+            Transform::from_xyz(0.0, EYE, 0.0),
+        ));
 }
 
 fn place_at_spawn(

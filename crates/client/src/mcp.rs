@@ -11,6 +11,7 @@ use bevy::log::tracing::field::{Field, Visit};
 use bevy::log::tracing::{Event, Subscriber};
 use bevy::log::tracing_subscriber::Layer;
 use bevy::log::tracing_subscriber::layer::Context;
+use bevy::pbr::ScreenSpaceTransmission;
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
@@ -266,6 +267,7 @@ fn answer(
                 let camera = commands
                     .spawn((
                         Camera3d::default(),
+                        ScreenSpaceTransmission::default(),
                         RenderTarget::from(image.clone()),
                         eye.compute_transform(),
                         Offscreen(time.elapsed()),
