@@ -66,7 +66,7 @@ impl Shapes {
     }
 
     fn world(self) -> World {
-        World::new(self.vertices, self.triangles)
+        World::new([(self.vertices, self.triangles)])
     }
 }
 
@@ -310,4 +310,46 @@ fn respawns_after_falling_past_the_depth() {
         state = next;
     }
     assert!(respawned, "{state:?}");
+}
+
+/// The floor plus one more mesh, as its own part of the world.
+fn floor_and(points: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> World {
+    let floor = Shapes::default().floor(0.0, 4);
+    World::new([(floor.vertices, floor.triangles), (points, triangles)])
+}
+
+#[test]
+fn stands_on_the_rim_of_a_small_dense_bowl_not_in_it() {
+    // A hemisphere of 0.8 m radius, open at the top: its rim is 0.8 m up, its bottom on the floor.
+    let (rings, segments) = (16, 32);
+    let point = |ring: u32, segment: u32| {
+        let theta = std::f32::consts::FRAC_PI_2 * ring as f32 / rings as f32;
+        let phi = std::f32::consts::TAU * segment as f32 / segments as f32;
+        Vec3::new(theta.sin() * phi.cos(), -theta.cos(), theta.sin() * phi.sin()) * 0.8
+            + Vec3::new(0.0, 0.8, 0.0)
+    };
+    let mut points = Vec::new();
+    let mut triangles = Vec::new();
+    for ring in 0..rings {
+        for segment in 0..segments {
+            let first = points.len() as u32;
+            points.extend([
+                point(ring, segment),
+                point(ring + 1, segment),
+                point(ring + 1, segment + 1),
+                point(ring, segment + 1),
+            ]);
+            triangles.extend([[first, first + 1, first + 2], [first, first + 2, first + 3]]);
+        }
+    }
+    let state = settle(&floor_and(points, triangles), State::at(Vec3::new(0.0, 2.0, 0.0)));
+    assert!((state.feet.y - 0.8).abs() < 0.05, "{state:?}");
+}
+
+#[test]
+fn stands_on_the_floor_beside_a_dense_mesh_collapsed_to_a_point() {
+    let points = vec![Vec3::new(2.0, 0.5, 2.0); 300];
+    let triangles = (0..100).map(|i| [i * 3, i * 3 + 1, i * 3 + 2]).collect();
+    let state = settle(&floor_and(points, triangles), State::at(Vec3::new(0.0, 1.0, 0.0)));
+    assert!(state.standing && state.feet.y.abs() < 0.05, "{state:?}");
 }

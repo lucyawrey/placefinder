@@ -25,7 +25,23 @@ fn temp_place(name: &str, files: &[(&str, &str)]) -> Address {
 
 #[test]
 fn every_example_portal_leads_to_a_place_that_loads() {
-    for name in ["", "meadow", "collision-test"] {
+    let materials = [
+        "anisotropy",
+        "clearcoat",
+        "emissive-strength",
+        "ior",
+        "lights-punctual",
+        "specular",
+        "texture-transform",
+        "transmission",
+        "unlit",
+        "volume",
+    ]
+    .map(|m| format!("materials/{m}"));
+    for name in ["", "meadow", "collision-test"]
+        .into_iter()
+        .chain(materials.iter().map(String::as_str))
+    {
         let place = example(name);
         let (_, manifest) = load(&place).unwrap();
         assert!(!manifest.portals.is_empty(), "{name:?} has no portals");

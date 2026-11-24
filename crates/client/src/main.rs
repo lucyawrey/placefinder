@@ -10,6 +10,7 @@ mod places;
 mod player;
 mod portals;
 mod settings;
+mod sky;
 mod source;
 
 use bevy::asset::AssetMetaCheck;
@@ -67,6 +68,7 @@ fn main() {
         places::PlacesPlugin,
         player::PlayerPlugin,
         portals::PortalsPlugin,
+        sky::SkyPlugin,
         address_bar::AddressBarPlugin,
     ));
     if let Some(port) = mcp_port {

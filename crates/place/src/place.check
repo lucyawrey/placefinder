@@ -1,5 +1,11 @@
 namespace place
 
+enum Sky {
+  Atmosphere
+  Gradient
+  None
+}
+
 class Portal(target: String, center: (Float, Float, Float), size: (Float, Float, Float))
 
 class Place {
@@ -9,4 +15,5 @@ class Place {
   let spawn: (Float, Float, Float)
   let portals: Portal[] = []
   let capture_mouse: Bool = false
+  let sky: Sky = Sky.Atmosphere
 }

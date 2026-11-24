@@ -11,7 +11,14 @@ path = "src/main.rs"
 [dependencies]
 axum = "0.8.9"
 base64 = "0.23.1"
-bevy = { version = "0.20.1", features = ["system_clipboard"] }
+bevy = { version = "0.20.1", features = [
+    "jpeg",
+    "pbr_anisotropy_texture",
+    "pbr_multi_layer_material_textures",
+    "pbr_specular_textures",
+    "pbr_transmission_textures",
+    "system_clipboard",
+] }
 check-core = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
 check-serde = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
 image = { version = "0.25.10", default-features = false, features = ["png"] }

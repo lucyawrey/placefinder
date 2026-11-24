@@ -1,0 +1,7 @@
+version = 0
+name = "Clearcoat"
+scene = "scene.glb"
+capture_mouse = true
+sky = Gradient
+spawn = (-2.13, -6.25, 16.78)
+portals = [(target = "../..", center = (-2.13, -5.25, 19.78), size = (1.5, 2.0, 0.3))]

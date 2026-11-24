@@ -11,6 +11,7 @@ use bevy::log::tracing::field::{Field, Visit};
 use bevy::log::tracing::{Event, Subscriber};
 use bevy::log::tracing_subscriber::Layer;
 use bevy::log::tracing_subscriber::layer::Context;
+use bevy::pbr::ScreenSpaceTransmission;
 use bevy::prelude::*;
 use bevy::render::render_resource::TextureFormat;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured};
@@ -29,6 +30,7 @@ use tokio::sync::oneshot;
 
 use crate::places::{Status, Travel, Traveling};
 use crate::player::Player;
+use crate::sky::{self, Gradient};
 
 pub const PORT: u16 = 7414;
 const KEPT_LINES: usize = 1000;
@@ -218,6 +220,7 @@ fn answer(
     mut images: ResMut<Assets<Image>>,
     offscreen: Query<(Entity, &Offscreen)>,
     time: Res<Time>,
+    gradient: Res<Gradient>,
 ) {
     // A capture that never arrives would leave its camera rendering for good.
     for (camera, spawned) in &offscreen {
@@ -264,11 +267,15 @@ fn answer(
                 let camera = commands
                     .spawn((
                         Camera3d::default(),
+                        ScreenSpaceTransmission::default(),
                         RenderTarget::from(image.clone()),
                         eye.compute_transform(),
                         Offscreen(time.elapsed()),
                     ))
                     .id();
+                if let Some(current) = &status.current {
+                    sky::show(&mut commands.entity(camera), current.manifest.sky, &gradient);
+                }
                 let mut reply = Some(reply);
                 commands.spawn(Screenshot::image(image)).observe(
                     move |captured: On<ScreenshotCaptured>, mut commands: Commands| {

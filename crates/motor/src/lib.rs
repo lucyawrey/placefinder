@@ -1,12 +1,17 @@
 use parry3d::math::{Pose, Vector};
-use parry3d::query::{self, Ray, RayCast, ShapeCastOptions};
-use parry3d::shape::{Capsule, TriMesh, TriMeshFlags};
+use parry3d::query::{self, PointQuery, Ray, RayCast, ShapeCastOptions};
+use parry3d::shape::{Capsule, Compound, Shape, SharedShape, TriMesh, TriMeshFlags};
 
 pub use parry3d::math::Vector as Vec3;
 
 /// Kept between the body and what it rests against, so moving along a surface doesn't hit it.
 const SKIN: f32 = 0.01;
 const SLIDES: usize = 4;
+/// Meshes smaller than this across, in meters, with more than `DENSE` triangles collide as a
+/// convex hull of at most `HULL_POINTS` points: testing every triangle of a dense prop is slow.
+const SMALL: f32 = 2.0;
+const DENSE: usize = 64;
+const HULL_POINTS: usize = 64;
 
 #[derive(Clone, Debug)]
 pub struct Settings {
@@ -41,17 +46,68 @@ impl Default for Settings {
     }
 }
 
-/// What the player collides with: triangles in world space.
-pub struct World(Option<TriMesh>);
+/// What the player collides with, in world space: triangles, and convex hulls standing in for
+/// small, dense meshes.
+pub struct World {
+    mesh: Option<TriMesh>,
+    hulls: Option<Compound>,
+}
 
 impl World {
-    pub fn new(vertices: Vec<Vec3>, triangles: Vec<[u32; 3]>) -> World {
-        if triangles.is_empty() {
-            return World(None);
+    /// Takes each mesh's points and triangles.
+    pub fn new(meshes: impl IntoIterator<Item = (Vec<Vec3>, Vec<[u32; 3]>)>) -> World {
+        let mut vertices = Vec::new();
+        let mut triangles = Vec::new();
+        let mut hulls = Vec::new();
+        for (points, mesh) in meshes {
+            match hull(&points, mesh.len()) {
+                Some(hull) => hulls.push((Pose::IDENTITY, hull)),
+                None => {
+                    let first = vertices.len() as u32;
+                    vertices.extend(points);
+                    triangles.extend(mesh.into_iter().map(|t| t.map(|i| first + i)));
+                }
+            }
         }
         let flags = TriMeshFlags::FIX_INTERNAL_EDGES_TWO_SIDED;
-        World(TriMesh::with_flags(vertices, triangles, flags).ok())
+        World {
+            mesh: (!triangles.is_empty())
+                .then(|| TriMesh::with_flags(vertices, triangles, flags).ok())
+                .flatten(),
+            hulls: (!hulls.is_empty()).then(|| Compound::new(hulls)),
+        }
     }
+
+    fn solids(&self) -> impl Iterator<Item = &dyn Shape> {
+        let mesh = self.mesh.iter().map(|m| m as &dyn Shape);
+        mesh.chain(self.hulls.iter().map(|h| h as &dyn Shape))
+    }
+}
+
+/// A simplified convex hull standing in for a small mesh of more than `DENSE` triangles, or `None`
+/// to keep its triangles, as for a mesh collapsed to a point.
+fn hull(points: &[Vec3], triangles: usize) -> Option<SharedShape> {
+    let (min, max) = points
+        .iter()
+        .fold((Vec3::MAX, Vec3::MIN), |(lo, hi), &p| (lo.min(p), hi.max(p)));
+    if triangles <= DENSE || (max - min).max_element() >= SMALL {
+        return None;
+    }
+    // The farthest point in each of `HULL_POINTS` directions spread evenly over a sphere.
+    let golden = std::f32::consts::PI * (3.0 - 5f32.sqrt());
+    let extremes: Vec<Vec3> = (0..HULL_POINTS)
+        .map(|i| {
+            let y = 1.0 - 2.0 * (i as f32 + 0.5) / HULL_POINTS as f32;
+            let (sin, cos) = (golden * i as f32).sin_cos();
+            let ring = (1.0 - y * y).sqrt();
+            let direction = Vec3::new(ring * cos, y, ring * sin);
+            *points
+                .iter()
+                .max_by(|a, b| a.dot(direction).total_cmp(&b.dot(direction)))
+                .expect("a dense mesh has points")
+        })
+        .collect();
+    SharedShape::convex_hull(&extremes)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -83,7 +139,13 @@ pub struct Input {
 /// Places the player at `at`, lifted onto the top of any solid mesh `at` is inside.
 pub fn spawn(world: &World, at: Vec3) -> State {
     let mut feet = at;
-    if let Some(mesh) = &world.0 {
+    if let Some(hulls) = &world.hulls
+        && hulls.contains_local_point(feet)
+        && let Some(exit) = hulls.cast_local_ray(&Ray::new(feet, Vec3::Y), f32::MAX, false)
+    {
+        feet.y += exit + SKIN;
+    }
+    if let Some(mesh) = &world.mesh {
         // Inside a closed mesh, a ray straight up meets the back of its upward-facing top.
         // Only checked here: from below, an upper story's floor faces up too.
         while let Some(hit) =
@@ -105,8 +167,8 @@ pub fn spawn(world: &World, at: Vec3) -> State {
 
 /// Advances the player by `dt` seconds.
 pub fn step(world: &World, settings: &Settings, state: State, input: Input, dt: f32) -> State {
-    let state = match &world.0 {
-        Some(mesh) => Body { mesh, settings }.advance(state, input, dt),
+    let state = match world.solids().next() {
+        Some(_) => Body { world, settings }.advance(state, input, dt),
         None => fall(settings, state, dt),
     };
     if state.feet.y < state.spawn.y - settings.respawn_depth {
@@ -134,7 +196,7 @@ enum Climb {
 }
 
 struct Body<'a> {
-    mesh: &'a TriMesh,
+    world: &'a World,
     settings: &'a Settings,
 }
 
@@ -203,15 +265,17 @@ impl Body<'_> {
     /// Moves the body out of anything it overlaps, as when spawning inside a mesh.
     fn push_out(&self, mut feet: Vec3) -> Vec3 {
         for _ in 0..SLIDES {
-            let contact = query::contact(
-                &Pose::IDENTITY,
-                self.mesh,
-                &self.pose(feet),
-                &self.capsule(),
-                0.0,
-            );
-            match contact {
-                Ok(Some(c)) if c.dist < 0.0 => feet += c.normal1 * (SKIN - c.dist),
+            let deepest = self
+                .world
+                .solids()
+                .filter_map(|solid| {
+                    query::contact(&Pose::IDENTITY, solid, &self.pose(feet), &self.capsule(), 0.0)
+                        .ok()
+                        .flatten()
+                })
+                .min_by(|a, b| a.dist.total_cmp(&b.dist));
+            match deepest {
+                Some(c) if c.dist < 0.0 => feet += c.normal1 * (SKIN - c.dist),
                 _ => break,
             }
         }
@@ -227,17 +291,25 @@ impl Body<'_> {
             stop_at_penetration: false,
             ..ShapeCastOptions::default()
         };
-        let hit = query::cast_shapes(
-            &Pose::IDENTITY,
-            Vec3::ZERO,
-            self.mesh,
-            &self.pose(feet),
-            motion / length,
-            &self.capsule(),
-            options,
-        );
-        match hit {
-            Ok(Some(hit)) => ((hit.time_of_impact - SKIN).max(0.0), Some(hit.normal1)),
+        let first = self
+            .world
+            .solids()
+            .filter_map(|solid| {
+                query::cast_shapes(
+                    &Pose::IDENTITY,
+                    Vec3::ZERO,
+                    solid,
+                    &self.pose(feet),
+                    motion / length,
+                    &self.capsule(),
+                    options,
+                )
+                .ok()
+                .flatten()
+            })
+            .min_by(|a, b| a.time_of_impact.total_cmp(&b.time_of_impact));
+        match first {
+            Some(hit) => ((hit.time_of_impact - SKIN).max(0.0), Some(hit.normal1)),
             _ => (length, None),
         }
     }
@@ -297,8 +369,12 @@ impl Body<'_> {
         let r = self.settings.radius;
         let probe = |x: f32, z: f32| {
             let ray = Ray::new(below + Vec3::new(x, r, z), -Vec3::Y);
-            self.mesh
-                .cast_ray_and_get_normal(&Pose::IDENTITY, &ray, r + SKIN * 3.0, false)
+            self.world
+                .solids()
+                .filter_map(|solid| {
+                    solid.cast_ray_and_get_normal(&Pose::IDENTITY, &ray, r + SKIN * 3.0, false)
+                })
+                .min_by(|a, b| a.time_of_impact.total_cmp(&b.time_of_impact))
                 .filter(|hit| self.walkable(hit.normal) || self.walkable(-hit.normal))
                 .map(|hit| below.y + r - hit.time_of_impact)
         };

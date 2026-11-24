@@ -1,5 +1,6 @@
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::mesh::PrimitiveTopology;
+use bevy::pbr::ScreenSpaceTransmission;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
@@ -7,6 +8,7 @@ use motor::{Input, Settings, State};
 
 use crate::places::{Arrived, Status, Traveling};
 use crate::portals::Portal;
+use crate::sky::{self, Gradient};
 
 /// A first-person player that walks on and bumps into the current Place's meshes.
 pub struct PlayerPlugin;
@@ -52,6 +54,9 @@ enum Collision {
     Built(Box<motor::World>),
 }
 
+#[derive(Component)]
+struct Eye;
+
 /// The camera's height above the feet.
 const EYE: f32 = 1.6;
 const SENSITIVITY: f32 = 0.002;
@@ -69,19 +74,24 @@ fn spawn(mut commands: Commands) {
             Transform::default(),
             Visibility::default(),
         ))
-        .with_child((Camera3d::default(), Transform::from_xyz(0.0, EYE, 0.0)));
-    commands.spawn((
-        DirectionalLight::default(),
-        Transform::from_xyz(2.0, 6.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+        .with_child((
+            Eye,
+            Camera3d::default(),
+            ScreenSpaceTransmission::default(),
+            Transform::from_xyz(0.0, EYE, 0.0),
+        ));
 }
 
 fn place_at_spawn(
     mut arrived: MessageReader<Arrived>,
     mut player: Single<(&mut Transform, &mut Player)>,
     mut collision: ResMut<Collision>,
+    eye: Single<Entity, With<Eye>>,
+    gradient: Res<Gradient>,
+    mut commands: Commands,
 ) {
     if let Some(arrived) = arrived.read().last() {
+        sky::show(&mut commands.entity(*eye), arrived.manifest.sky, &gradient);
         let spawn = Vec3::from_array(arrived.manifest.spawn.map(|v| v as f32));
         player.0.translation = spawn;
         player.1.state = State::at(spawn);
@@ -90,15 +100,28 @@ fn place_at_spawn(
     }
 }
 
+/// Lights a scene that brings no lights of its own with a sun, which leaves with the Place.
 fn scene_ready(
     ready: On<WorldInstanceReady>,
     status: Res<Status>,
     parents: Query<&ChildOf>,
+    children: Query<&Children>,
+    lights: Query<(), Or<(With<DirectionalLight>, With<PointLight>, With<SpotLight>)>>,
     mut collision: ResMut<Collision>,
+    mut commands: Commands,
 ) {
-    let current = status.current.as_ref().map(|c| c.root);
-    if parents.get(ready.entity).ok().map(|p| p.parent()) == current {
-        *collision = Collision::Spawned;
+    let Some(root) = status.current.as_ref().map(|c| c.root) else {
+        return;
+    };
+    if parents.get(ready.entity).ok().map(|p| p.parent()) != Some(root) {
+        return;
+    }
+    *collision = Collision::Spawned;
+    if !children.iter_descendants(ready.entity).any(|e| lights.contains(e)) {
+        commands.entity(root).with_child((
+            DirectionalLight::default(),
+            Transform::from_xyz(2.0, 6.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ));
     }
 }
 
@@ -113,32 +136,26 @@ fn build_world(
     let (Collision::Spawned, Some(current)) = (&*collision, &status.current) else {
         return;
     };
-    let mut vertices = Vec::new();
-    let mut triangles = Vec::new();
+    let mut parts = Vec::new();
     for (entity, handle, global) in &solids {
         if !parents.iter_ancestors(entity).any(|a| a == current.root) {
             continue;
         }
         if let Some(mesh) = meshes.get(handle) {
-            add_triangles(mesh, global, &mut vertices, &mut triangles);
+            parts.extend(triangles(mesh, global));
         }
     }
-    let world = motor::World::new(vertices, triangles);
+    let world = motor::World::new(parts);
     player.state = motor::spawn(&world, player.state.spawn);
     player.previous = player.state.feet;
     *collision = Collision::Built(Box::new(world));
 }
 
-/// Adds a mesh's triangles, in world space, to the collision world being built.
-fn add_triangles(
-    mesh: &Mesh,
-    global: &GlobalTransform,
-    vertices: &mut Vec<Vec3>,
-    triangles: &mut Vec<[u32; 3]>,
-) {
+/// A mesh's points, in world space, and triangles, for the collision world being built.
+fn triangles(mesh: &Mesh, global: &GlobalTransform) -> Option<(Vec<Vec3>, Vec<[u32; 3]>)> {
     if mesh.primitive_topology() != PrimitiveTopology::TriangleList {
         warn!("no collision for a mesh that isn't a triangle list");
-        return;
+        return None;
     }
     let Some(positions) = mesh
         .try_attribute_option(Mesh::ATTRIBUTE_POSITION)
@@ -147,20 +164,19 @@ fn add_triangles(
         .and_then(|p| p.as_float3())
     else {
         warn!("no collision for a mesh without 32-bit float positions");
-        return;
+        return None;
     };
-    let first = vertices.len() as u32;
     let affine = global.affine();
-    vertices.extend(positions.iter().map(|&p| affine.transform_point3(p.into())));
+    let points = positions.iter().map(|&p| affine.transform_point3(p.into())).collect();
     let indices: Vec<u32> = match mesh.indices() {
         Some(indices) => indices.iter().map(|i| i as u32).collect(),
         None => (0..positions.len() as u32).collect(),
     };
     let mirrored = affine.matrix3.determinant() < 0.0;
-    triangles.extend(indices.as_chunks::<3>().0.iter().map(|t| {
-        let [a, b, c] = t.map(|i| first + i);
+    let triangles = indices.as_chunks::<3>().0.iter().map(|&[a, b, c]| {
         if mirrored { [a, c, b] } else { [a, b, c] }
-    }));
+    });
+    Some((points, triangles.collect()))
 }
 
 fn look(
