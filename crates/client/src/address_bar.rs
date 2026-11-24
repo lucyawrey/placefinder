@@ -106,9 +106,14 @@ fn show_status(
         return;
     }
     let (entity, editable) = &mut *field;
-    if let (Some(current), false) = (&status.current, focus.get() == Some(*entity)) {
+    // Before any Place has loaded, the address being loaded stays shown, even after it fails.
+    let shown = match &status.current {
+        Some(current) => Some(current.address.to_string()),
+        None => status.loading.clone(),
+    };
+    if let (Some(address), false) = (shown, focus.get() == Some(*entity)) {
         editable.queue_edit(TextEdit::SelectAll);
-        editable.queue_edit(TextEdit::Insert(current.address.to_string().into()));
+        editable.queue_edit(TextEdit::Insert(address.into()));
     }
     **spinner = if status.loading.is_some() {
         Visibility::Inherited
