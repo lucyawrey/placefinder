@@ -25,8 +25,8 @@ impl Plugin for SkyPlugin {
 pub struct Gradient(Handle<Image>);
 
 const SIZE: u32 = 64;
-/// In cd/m², chosen to look like daylight at the camera's default exposure.
-const BRIGHTNESS: f32 = 1000.0;
+/// In cd/m², picked by eye at the camera's default exposure.
+const BRIGHTNESS: f32 = 500.0;
 
 fn setup(
     mut commands: Commands,
