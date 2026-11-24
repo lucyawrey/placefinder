@@ -1,8 +1,10 @@
 pub mod address;
+pub mod copy;
 pub mod fetch;
 pub mod manifest;
 
 pub use address::{Address, Base};
+pub use copy::Text;
 pub use manifest::Manifest;
 
 /// The manifest file inside every Place.
@@ -22,11 +24,8 @@ impl std::fmt::Display for LoadError {
         match self {
             LoadError::Fetch(e) => write!(f, "{e}"),
             LoadError::Manifest(e) => write!(f, "{e}"),
-            LoadError::NotText => write!(f, "[a manifest that isn't UTF-8 text]"),
-            LoadError::NotAPlace(name) => write!(
-                f,
-                "[a named manifest that isn't marked as a Place, and how to mark it: {name}]"
-            ),
+            LoadError::NotText => f.write_str(Text::manifest_not_text.get()),
+            LoadError::NotAPlace(name) => f.write_str(&Text::not_a_place.fill(&[("name", name)])),
         }
     }
 }

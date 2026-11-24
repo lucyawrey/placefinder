@@ -170,10 +170,7 @@ fn finish_travel(
             fail(
                 &mut status,
                 failed.unwrap_or_else(|| {
-                    format!(
-                        "[a scene file with no scene in it: {}]",
-                        place.manifest.scene
-                    )
+                    place::Text::scene_without_scene.fill(&[("scene", &place.manifest.scene)])
                 }),
             );
             continue;

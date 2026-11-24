@@ -1,0 +1,26 @@
+// Addresses
+empty_address = "[an empty address]"
+address_without_host = "[an address with no host]"
+bad_port = "[a port that isn't a number: {port}]"
+above_root = "[a path that goes above the site's root]"
+bad_path_part = "[a path part containing \\ or :, which aren't allowed: {part}]"
+
+// Loading a Place
+file_outside_place = "[a file path outside the Place: {path}]"
+file_not_found = "[a file that wasn't found: {path}]"
+manifest_not_text = "[a manifest that isn't UTF-8 text]"
+not_a_place = "[a named manifest that isn't marked as a Place, and how to mark it: {name}]"
+unknown_manifest_version = "[a manifest version this client doesn't read: {version}, reads {reads}]"
+scene_without_scene = "[a scene file with no scene in it: {scene}]"
+load_failed = "[error shown when a Place fails to load, with the reason] {reason}"
+
+// Command line
+port_too_large = "[a port number that's too large: {port}]"
+
+// Developer MCP
+mcp_listen_failed = "[the MCP server couldn't listen on port {port}: {error}]"
+mcp_replaced = "[a load that another travel replaced before it finished]"
+mcp_timed_out = "[a request the client didn't answer within 30 seconds]"
+mcp_no_view = "[a screenshot asked for before the client has a window and a camera]"
+mcp_minimized = "[a screenshot asked for while the window is minimized]"
+mcp_closed = "[a request the client closed before answering]"

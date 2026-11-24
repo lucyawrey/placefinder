@@ -33,11 +33,6 @@ use crate::player::Player;
 pub const PORT: u16 = 7414;
 const KEPT_LINES: usize = 1000;
 const TIMEOUT: Duration = Duration::from_secs(30);
-const REPLACED: &str = "[a load that another travel replaced before it finished]";
-const TIMED_OUT: &str = "[a request the client didn't answer within 30 seconds]";
-const NO_VIEW: &str = "[a screenshot asked for before the client has a window and a camera]";
-const MINIMIZED: &str = "[a screenshot asked for while the window is minimized]";
-const CLOSED: &str = "[a request the client closed before answering]";
 
 /// Serves the developer MCP on `127.0.0.1:<port>`; port 0 picks a free one.
 pub struct McpPlugin {
@@ -56,10 +51,9 @@ impl Plugin for McpPlugin {
         let listener = std::net::TcpListener::bind(("127.0.0.1", self.port))
             .and_then(|l| l.set_nonblocking(true).map(|_| l))
             .unwrap_or_else(|e| {
-                eprintln!(
-                    "[the MCP server couldn't listen on port {}: {e}]",
-                    self.port
-                );
+                let slots: [(&str, &dyn std::fmt::Display); 2] =
+                    [("port", &self.port), ("error", &e)];
+                eprintln!("{}", place::Text::mcp_listen_failed.fill(&slots));
                 std::process::exit(1);
             });
         let port = listener.local_addr().unwrap().port();
@@ -198,11 +192,11 @@ impl Tools {
         let (reply, answer) = oneshot::channel();
         self.requests
             .send(request(reply))
-            .map_err(|_| CLOSED.to_string())?;
+            .map_err(|_| place::Text::mcp_closed.get().to_string())?;
         match tokio::time::timeout(TIMEOUT, answer).await {
             Ok(Ok(value)) => Ok(value),
-            Ok(Err(_)) => Err(CLOSED.into()),
-            Err(_) => Err(TIMED_OUT.into()),
+            Ok(Err(_)) => Err(place::Text::mcp_closed.get().into()),
+            Err(_) => Err(place::Text::mcp_timed_out.get().into()),
         }
     }
 }
@@ -254,11 +248,11 @@ fn answer(
             // A camera following the player's renders into an image instead.
             Request::Screenshot(reply) => {
                 let (Ok(window), Ok(eye)) = (window.single(), scene.camera.single()) else {
-                    _ = reply.send(Err(NO_VIEW.into()));
+                    _ = reply.send(Err(place::Text::mcp_no_view.get().into()));
                     continue;
                 };
                 if window.physical_width() == 0 || window.physical_height() == 0 {
-                    _ = reply.send(Err(MINIMIZED.into()));
+                    _ = reply.send(Err(place::Text::mcp_minimized.get().into()));
                     continue;
                 }
                 let image = images.add(Image::new_target_texture(
@@ -352,7 +346,7 @@ fn outcome(status: &Status, address: &str) -> Option<Result<String, String>> {
         (None, None, Some(current)) if current.address.to_string() == address => {
             Some(Ok(address.into()))
         }
-        _ => Some(Err(REPLACED.into())),
+        _ => Some(Err(place::Text::mcp_replaced.get().into())),
     }
 }
 
@@ -569,7 +563,7 @@ mod tests {
                 }
             },
         );
-        assert_eq!(text(&replaced), REPLACED);
+        assert_eq!(text(&replaced), place::Text::mcp_replaced.get());
     }
 
     #[test]

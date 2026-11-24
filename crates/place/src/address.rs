@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
-use crate::MANIFEST;
+use crate::{MANIFEST, Text};
 
 /// Where a Place lives: a folder holding its `place.con`, or a `place://` address. Either may
 /// instead name a `.con` manifest, whose folder is then the Place's base.
@@ -40,14 +40,11 @@ pub enum AddressError {
 impl fmt::Display for AddressError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            AddressError::Empty => write!(f, "[an empty address]"),
-            AddressError::MissingHost => write!(f, "[an address with no host]"),
-            AddressError::BadPort(p) => write!(f, "[a port that isn't a number: {p}]"),
-            AddressError::AboveRoot => write!(f, "[a path that goes above the site's root]"),
-            AddressError::BadSegment(s) => write!(
-                f,
-                "[a path part containing \\ or :, which aren't allowed: {s}]"
-            ),
+            AddressError::Empty => f.write_str(Text::empty_address.get()),
+            AddressError::MissingHost => f.write_str(Text::address_without_host.get()),
+            AddressError::BadPort(p) => f.write_str(&Text::bad_port.fill(&[("port", p)])),
+            AddressError::AboveRoot => f.write_str(Text::above_root.get()),
+            AddressError::BadSegment(s) => f.write_str(&Text::bad_path_part.fill(&[("part", s)])),
         }
     }
 }

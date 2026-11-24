@@ -31,7 +31,7 @@ fn main() {
         let port = args.next_if(|a| !a.is_empty() && a.bytes().all(|b| b.is_ascii_digit()));
         mcp_port = Some(port.map_or(mcp::PORT, |p| {
             p.parse().unwrap_or_else(|_| {
-                eprintln!("[a port number that's too large: {p}]");
+                eprintln!("{}", place::Text::port_too_large.fill(&[("port", &p)]));
                 std::process::exit(1);
             })
         }));

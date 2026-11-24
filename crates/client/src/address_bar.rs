@@ -121,9 +121,7 @@ fn show_status(
         Visibility::Hidden
     };
     text.0 = match &status.error {
-        Some(reason) => {
-            format!("[error shown when a Place fails to load, with the reason] {reason}")
-        }
+        Some(reason) => place::Text::load_failed.fill(&[("reason", reason)]),
         None => String::new(),
     };
 }
