@@ -23,8 +23,18 @@ pub struct Manifest {
     pub portals: Vec<Portal>,
     /// Whether clicking the scene captures the mouse, for looking around and walking.
     pub capture_mouse: bool,
-    /// Whether the default sky lights the scene and shows behind it.
-    pub environment_light: bool,
+    pub sky: Sky,
+}
+
+/// What shows behind a Place's scene and lights it.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+pub enum Sky {
+    /// A planet's sky, with ground below the horizon.
+    Atmosphere,
+    /// A sky with no ground or horizon.
+    Gradient,
+    /// A plain background and no light from the sky.
+    None,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

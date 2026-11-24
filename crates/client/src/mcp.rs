@@ -7,7 +7,6 @@ use base64::Engine;
 use bevy::camera::RenderTarget;
 use bevy::ecs::system::SystemParam;
 use bevy::log::BoxedLayer;
-use bevy::pbr::AtmosphereSettings;
 use bevy::log::tracing::field::{Field, Visit};
 use bevy::log::tracing::{Event, Subscriber};
 use bevy::log::tracing_subscriber::Layer;
@@ -29,7 +28,8 @@ use rmcp::{tool, tool_router};
 use tokio::sync::oneshot;
 
 use crate::places::{Status, Travel, Traveling};
-use crate::player::{self, Player};
+use crate::player::Player;
+use crate::sky::{self, Gradient};
 
 pub const PORT: u16 = 7414;
 const KEPT_LINES: usize = 1000;
@@ -219,6 +219,7 @@ fn answer(
     mut images: ResMut<Assets<Image>>,
     offscreen: Query<(Entity, &Offscreen)>,
     time: Res<Time>,
+    gradient: Res<Gradient>,
 ) {
     // A capture that never arrives would leave its camera rendering for good.
     for (camera, spawned) in &offscreen {
@@ -248,7 +249,7 @@ fn answer(
             // macOS doesn't draw a covered window, so a window screenshot comes back empty.
             // A camera following the player's renders into an image instead.
             Request::Screenshot(reply) => {
-                let (Ok(window), Ok((eye, sky))) = (window.single(), scene.camera.single()) else {
+                let (Ok(window), Ok(eye)) = (window.single(), scene.camera.single()) else {
                     _ = reply.send(Err(place::Text::mcp_no_view.get().into()));
                     continue;
                 };
@@ -270,8 +271,8 @@ fn answer(
                         Offscreen(time.elapsed()),
                     ))
                     .id();
-                if sky {
-                    commands.entity(camera).insert(player::sky());
+                if let Some(current) = &status.current {
+                    sky::show(&mut commands.entity(camera), current.manifest.sky, &gradient);
                 }
                 let mut reply = Some(reply);
                 commands.spawn(Screenshot::image(image)).observe(
@@ -297,12 +298,7 @@ struct Scene<'w, 's> {
     parents: Query<'w, 's, &'static ChildOf>,
     nodes: Query<'w, 's, (&'static Name, &'static GlobalTransform)>,
     player: Query<'w, 's, &'static GlobalTransform, With<Player>>,
-    camera: Query<
-        'w,
-        's,
-        (&'static GlobalTransform, Has<AtmosphereSettings>),
-        (With<Camera3d>, Without<Offscreen>),
-    >,
+    camera: Query<'w, 's, &'static GlobalTransform, (With<Camera3d>, Without<Offscreen>)>,
 }
 
 impl Scene<'_, '_> {
@@ -334,7 +330,7 @@ impl Scene<'_, '_> {
         let player = self.player.single().ok().map(|p| {
             json!({
                 "position": p.translation().to_array(),
-                "facing": self.camera.single().ok().map(|(c, _)| c.forward().to_array()),
+                "facing": self.camera.single().ok().map(|c| c.forward().to_array()),
             })
         });
         json!({

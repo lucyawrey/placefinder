@@ -1,9 +1,5 @@
-use bevy::camera::Hdr;
 use bevy::input::mouse::AccumulatedMouseMotion;
-use bevy::light::atmosphere::ScatteringMedium;
-use bevy::light::{Atmosphere, AtmosphereEnvironmentMapLight, GeneratedEnvironmentMapLight};
 use bevy::mesh::PrimitiveTopology;
-use bevy::pbr::AtmosphereSettings;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
@@ -11,6 +7,7 @@ use motor::{Input, Settings, State};
 
 use crate::places::{Arrived, Status, Traveling};
 use crate::portals::Portal;
+use crate::sky::{self, Gradient};
 
 /// A first-person player that walks on and bumps into the current Place's meshes.
 pub struct PlayerPlugin;
@@ -59,19 +56,11 @@ enum Collision {
 #[derive(Component)]
 struct Eye;
 
-/// The default sky, which lights the scene and shows behind it.
-pub fn sky() -> impl Bundle {
-    (
-        AtmosphereSettings::default(),
-        AtmosphereEnvironmentMapLight::default(),
-    )
-}
-
 /// The camera's height above the feet.
 const EYE: f32 = 1.6;
 const SENSITIVITY: f32 = 0.002;
 
-fn spawn(mut commands: Commands, mut media: ResMut<Assets<ScatteringMedium>>) {
+fn spawn(mut commands: Commands) {
     commands
         .spawn((
             Player {
@@ -85,7 +74,6 @@ fn spawn(mut commands: Commands, mut media: ResMut<Assets<ScatteringMedium>>) {
             Visibility::default(),
         ))
         .with_child((Eye, Camera3d::default(), Transform::from_xyz(0.0, EYE, 0.0)));
-    commands.spawn(Atmosphere::earth(media.add(ScatteringMedium::earth(256, 256))));
 }
 
 fn place_at_spawn(
@@ -93,19 +81,11 @@ fn place_at_spawn(
     mut player: Single<(&mut Transform, &mut Player)>,
     mut collision: ResMut<Collision>,
     eye: Single<Entity, With<Eye>>,
+    gradient: Res<Gradient>,
     mut commands: Commands,
 ) {
     if let Some(arrived) = arrived.read().last() {
-        if arrived.manifest.environment_light {
-            commands.entity(*eye).insert(sky());
-        } else {
-            commands.entity(*eye).remove::<(
-                AtmosphereSettings,
-                AtmosphereEnvironmentMapLight,
-                GeneratedEnvironmentMapLight,
-                Hdr,
-            )>();
-        }
+        sky::show(&mut commands.entity(*eye), arrived.manifest.sky, &gradient);
         let spawn = Vec3::from_array(arrived.manifest.spawn.map(|v| v as f32));
         player.0.translation = spawn;
         player.1.state = State::at(spawn);

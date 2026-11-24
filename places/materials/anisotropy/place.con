@@ -2,5 +2,6 @@ version = 0
 name = "Anisotropy"
 scene = "scene.glb"
 capture_mouse = true
+sky = Gradient
 spawn = (-0.39, -0.99, 9.48)
 portals = [(target = "../..", center = (-0.39, 0.01, 12.48), size = (1.5, 2.0, 0.3))]

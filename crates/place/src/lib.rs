@@ -5,7 +5,7 @@ pub mod manifest;
 
 pub use address::{Address, Base};
 pub use copy::Text;
-pub use manifest::Manifest;
+pub use manifest::{Manifest, Sky};
 
 /// The manifest file inside every Place.
 pub const MANIFEST: &str = "place.con";

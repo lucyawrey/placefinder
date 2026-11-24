@@ -253,7 +253,7 @@ pub(crate) mod tests {
                 .disable::<bevy::gilrs::GilrsPlugin>()
                 .disable::<bevy::log::LogPlugin>(),
         )
-        .add_plugins(PlacesPlugin);
+        .add_plugins((PlacesPlugin, crate::sky::SkyPlugin));
         setup(&mut app);
         app.finish();
         app.cleanup();
