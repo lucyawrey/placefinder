@@ -4,6 +4,7 @@
 
 mod address_bar;
 mod folders;
+mod labels;
 mod log_file;
 mod mcp;
 mod places;
@@ -68,6 +69,7 @@ fn main() {
         places::PlacesPlugin,
         player::PlayerPlugin,
         portals::PortalsPlugin,
+        labels::LabelsPlugin,
         sky::SkyPlugin,
         address_bar::AddressBarPlugin,
     ));

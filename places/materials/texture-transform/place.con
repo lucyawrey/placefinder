@@ -1,5 +1,5 @@
 version = 0
-name = "Texture transform"
+name = "Texture Transform"
 scene = "TextureTransformTest.gltf"
 capture_mouse = true
 sky = Gradient
