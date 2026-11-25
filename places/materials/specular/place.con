@@ -1,7 +1,7 @@
-version = 0
+version = "0.1.0"
 name = "Specular"
 scene = "scene.glb"
 capture_mouse = true
 sky = Gradient
-spawn = (-0.19, -1.6, 1.55)
+spawn = (center = (-0.19, -1.6, 1.55))
 portals = [(target = "../..", center = (-0.19, -0.6, 4.55), size = (1.5, 2.0, 0.3))]

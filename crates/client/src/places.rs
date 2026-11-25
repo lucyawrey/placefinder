@@ -313,7 +313,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_failed_load_keeps_the_current_place() {
-        let manifest = "version = 0\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (0.0, 0.0, 0.0)";
+        let manifest = "version = \"0.1.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
         let failing = [
             temp_place("missing-scene", &[("place.con", manifest)]),
             temp_place("invalid", &[("place.con", "name = 3")]),

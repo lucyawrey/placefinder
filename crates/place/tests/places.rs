@@ -5,7 +5,7 @@ use place::manifest::ManifestError;
 use place::{Address, LoadError, load};
 
 fn example(name: &str) -> Address {
-    Address::Folder(
+    Address::folder(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../places")
             .join(name),
@@ -20,7 +20,7 @@ fn temp_place(name: &str, files: &[(&str, &str)]) -> Address {
     for (file, text) in files {
         std::fs::write(dir.join(file), text).unwrap();
     }
-    Address::Folder(dir)
+    Address::folder(dir)
 }
 
 #[test]
@@ -70,13 +70,32 @@ fn an_invalid_manifest_is_refused() {
     ));
 }
 
+/// A manifest with the given version and otherwise the least it needs.
+fn versioned(version: &str) -> String {
+    format!("version = {version}\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))")
+}
+
 #[test]
-fn an_unknown_manifest_version_is_refused() {
-    let manifest = "version = 9\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (0.0, 0.0, 0.0)";
-    let address = temp_place("version", &[("place.con", manifest)]);
+fn refuses_other_manifest_versions_but_reads_any_patch() {
+    for version in ["\"0.2.0\"", "\"1.1.0\"", "0"] {
+        let address = temp_place("version", &[("place.con", &versioned(version))]);
+        assert!(
+            matches!(load(&address), Err(LoadError::Manifest(ManifestError::Version(_)))),
+            "{version}"
+        );
+    }
+    let address = temp_place("patch", &[("place.con", &versioned("\"0.1.7\""))]);
+    assert!(load(&address).is_ok());
+}
+
+#[test]
+fn refuses_two_portals_with_one_name() {
+    let portal = "(target = \"b\", center = (0.0, 1.0, 0.0), size = (1.0, 2.0, 0.3), name = \"gate\")";
+    let manifest = format!("{}\nportals = [{portal}, {portal}]", versioned("\"0.1.0\""));
+    let address = temp_place("duplicate", &[("place.con", &manifest)]);
     assert!(matches!(
         load(&address),
-        Err(LoadError::Manifest(ManifestError::Version(9)))
+        Err(LoadError::Manifest(ManifestError::DuplicatePortal(name))) if name == "gate"
     ));
 }
 
@@ -93,7 +112,7 @@ fn refuses_files_outside_the_place_on_every_platform() {
 
 #[test]
 fn loads_a_named_manifest_only_if_marked_as_a_place() {
-    let fields = "version = 0, name = \"A\", scene = \"s.gltf\", spawn = (0.0, 0.0, 0.0)";
+    let fields = "version = \"0.1.0\", name = \"A\", scene = \"s.gltf\", spawn = (center = (0.0, 0.0, 0.0))";
     let (written, plain) = (format!("Place({fields})"), format!("({fields})"));
     let folder = temp_place(
         "named",
@@ -115,10 +134,10 @@ fn loads_a_named_manifest_only_if_marked_as_a_place() {
 
 #[test]
 fn reads_labels_and_portal_signs() {
-    let manifest = r#"version = 0
+    let manifest = r#"version = "0.1.0"
 name = "A"
 scene = "s.gltf"
-spawn = (0.0, 0.0, 0.0)
+spawn = (center = (0.0, 0.0, 0.0))
 portals = [
     (target = "b", center = (0.0, 1.0, 0.0), size = (1.0, 2.0, 0.3), label = "To B")
     (target = "c", center = (2.0, 1.0, 0.0), size = (1.0, 2.0, 0.3), show_label = false)

@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn fetches_each_needed_name_once() {
-        let here = Address::Folder("/places/home".into());
+        let here = Address::folder("/places/home");
         let portals = [
             portal("a", None, true),
             portal("./a", None, true),

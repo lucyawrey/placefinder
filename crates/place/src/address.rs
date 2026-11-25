@@ -7,7 +7,10 @@ use crate::{MANIFEST, Text};
 /// instead name a `.con` manifest, whose folder is then the Place's base.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Address {
-    Folder(PathBuf),
+    Folder {
+        path: PathBuf,
+        fragment: Option<String>,
+    },
     Served(Served),
 }
 
@@ -16,7 +19,6 @@ pub struct Served {
     pub host: String,
     pub port: Option<u16>,
     pub path: Vec<String>,
-    /// Kept for display; arrival ignores it for now.
     pub fragment: Option<String>,
 }
 
@@ -58,8 +60,12 @@ impl Address {
             return Err(AddressError::Empty);
         }
         let Some(rest) = input.strip_prefix(SCHEME) else {
+            let (input, fragment) = split_fragment(input);
             let path = std::path::absolute(input).unwrap_or_else(|_| input.into());
-            return Ok(Address::Folder(normalize_path(&path)));
+            return Ok(Address::Folder {
+                path: normalize_path(&path),
+                fragment,
+            });
         };
         let (rest, fragment) = split_fragment(rest);
         let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
@@ -96,11 +102,14 @@ impl Address {
         }
         let (relative, fragment) = split_fragment(target);
         match self {
-            Address::Folder(_) => {
+            Address::Folder { .. } => {
                 let Base::Folder(dir) = self.base() else {
                     unreachable!()
                 };
-                Ok(Address::Folder(normalize_path(&dir.join(relative))))
+                Ok(Address::Folder {
+                    path: normalize_path(&dir.join(relative)),
+                    fragment,
+                })
             }
             Address::Served(served) => {
                 let segments = served
@@ -118,6 +127,33 @@ impl Address {
         }
     }
 
+    /// A folder address with no fragment.
+    pub fn folder(path: impl Into<PathBuf>) -> Address {
+        Address::Folder {
+            path: path.into(),
+            fragment: None,
+        }
+    }
+
+    /// The part after `#`, which names a Portal in the Place.
+    pub fn fragment(&self) -> Option<&str> {
+        match self {
+            Address::Folder { fragment, .. } | Address::Served(Served { fragment, .. }) => {
+                fragment.as_deref()
+            }
+        }
+    }
+
+    pub fn without_fragment(&self) -> Address {
+        let mut address = self.clone();
+        match &mut address {
+            Address::Folder { fragment, .. } | Address::Served(Served { fragment, .. }) => {
+                *fragment = None
+            }
+        }
+        address
+    }
+
     /// The manifest's file name: the one named, or `place.con`.
     pub fn manifest(&self) -> &str {
         self.named().unwrap_or(MANIFEST)
@@ -125,7 +161,7 @@ impl Address {
 
     fn named(&self) -> Option<&str> {
         let last = match self {
-            Address::Folder(path) => path.file_name().and_then(|n| n.to_str()),
+            Address::Folder { path, .. } => path.file_name().and_then(|n| n.to_str()),
             Address::Served(served) => served.path.last().map(String::as_str),
         };
         last.filter(|n| n.ends_with(".con"))
@@ -134,10 +170,10 @@ impl Address {
     /// The folder holding the manifest.
     pub fn base(&self) -> Base {
         match self {
-            Address::Folder(path) if self.named().is_some() => {
+            Address::Folder { path, .. } if self.named().is_some() => {
                 Base::Folder(path.parent().unwrap_or(Path::new("")).to_path_buf())
             }
-            Address::Folder(dir) => Base::Folder(dir.clone()),
+            Address::Folder { path, .. } => Base::Folder(path.clone()),
             Address::Served(served) => {
                 // Plain HTTP only for local development, as browsers allow for localhost.
                 let local = matches!(served.host.as_str(), "localhost" | "127.0.0.1" | "[::1]");
@@ -153,7 +189,7 @@ impl Address {
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Address::Folder(dir) => write!(f, "{}", dir.display()),
+            Address::Folder { path, .. } => write!(f, "{}", path.display())?,
             Address::Served(served) => {
                 write!(f, "{SCHEME}{}", served.host)?;
                 if let Some(port) = served.port {
@@ -162,12 +198,12 @@ impl fmt::Display for Address {
                 for segment in &served.path {
                     write!(f, "/{segment}")?;
                 }
-                if let Some(fragment) = &served.fragment {
-                    write!(f, "#{fragment}")?;
-                }
-                Ok(())
             }
         }
+        if let Some(fragment) = self.fragment() {
+            write!(f, "#{fragment}")?;
+        }
+        Ok(())
     }
 }
 
@@ -265,10 +301,13 @@ mod tests {
     }
 
     #[test]
-    fn keeps_the_fragment_for_display_only() {
-        let address = parse("place://a.com/garden#lobby");
-        assert_eq!(address.to_string(), "place://a.com/garden#lobby");
-        assert_eq!(address.base(), parse("place://a.com/garden").base());
+    fn keeps_the_fragment_out_of_the_base() {
+        for address in ["place://a.com/garden#lobby", "/x/garden#lobby"] {
+            let address = parse(address);
+            assert_eq!(address.fragment(), Some("lobby"));
+            assert_eq!(address.base(), address.without_fragment().base());
+        }
+        assert_eq!(parse("place://a.com/garden#lobby").to_string(), "place://a.com/garden#lobby");
     }
 
     #[test]
@@ -299,10 +338,10 @@ mod tests {
             from.resolve("pond").unwrap(),
             parse("place://a.com:8080/places/garden/pond")
         );
-        let folder = Address::Folder(PathBuf::from("/home/x/places/garden"));
+        let folder = Address::folder(PathBuf::from("/home/x/places/garden"));
         assert_eq!(
             folder.resolve("../meadow").unwrap(),
-            Address::Folder(PathBuf::from("/home/x/places/meadow"))
+            Address::folder(PathBuf::from("/home/x/places/meadow"))
         );
     }
 
@@ -315,12 +354,12 @@ mod tests {
             lobby.resolve("pond").unwrap(),
             parse("place://a.com/garden/pond")
         );
-        let folder = Address::Folder(PathBuf::from("/x/garden/lobby.con"));
+        let folder = Address::folder(PathBuf::from("/x/garden/lobby.con"));
         assert_eq!(folder.manifest(), "lobby.con");
         assert_eq!(folder.base(), Base::Folder(PathBuf::from("/x/garden")));
         assert_eq!(
             folder.resolve("pond").unwrap(),
-            Address::Folder(PathBuf::from("/x/garden/pond"))
+            Address::folder(PathBuf::from("/x/garden/pond"))
         );
         assert_eq!(parse("place://a.com/garden").manifest(), "place.con");
     }
@@ -335,7 +374,7 @@ mod tests {
         let absolute = std::env::temp_dir().join("x");
         assert_eq!(
             from.resolve(absolute.to_str().unwrap()).unwrap(),
-            Address::Folder(absolute)
+            Address::folder(absolute)
         );
     }
 
@@ -344,7 +383,7 @@ mod tests {
         let cwd = std::env::current_dir().unwrap();
         assert_eq!(
             parse("places/./x/../garden"),
-            Address::Folder(cwd.join("places").join("garden"))
+            Address::folder(cwd.join("places").join("garden"))
         );
     }
 }
