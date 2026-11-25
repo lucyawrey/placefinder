@@ -119,7 +119,7 @@ struct Tools {
 #[serde(crate = "rmcp::serde")]
 #[schemars(crate = "rmcp::schemars")]
 struct LoadPlace {
-    /// A Place folder path, a `.con` manifest path, or a `place://` address.
+    /// A Place folder path, a `.con` or `.json` manifest path, or a `place://` address.
     address: String,
 }
 

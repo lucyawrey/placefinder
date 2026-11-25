@@ -44,6 +44,7 @@ fn content_type(path: &str) -> &'static str {
         Some("png") => "image/png",
         Some("jpg" | "jpeg") => "image/jpeg",
         Some("con") => "text/plain; charset=utf-8",
+        Some("json") => "application/json",
         _ => "application/octet-stream",
     }
 }
@@ -126,6 +127,18 @@ mod tests {
             load_served(root, "a").await,
             Err(LoadError::Manifest(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn loads_a_json_place_over_http_and_reports_a_missing_place_con() {
+        let manifest = br#"{"version": "0.1.0", "name": "A", "scene": "s.gltf", "spawn": {"center": [0, 0, 0]}}"#;
+        let root = temp_root("json", &[("a/place.json", manifest), ("b/x.txt", b"")]);
+        let (_, manifest) = load_served(root.clone(), "a").await.unwrap();
+        assert_eq!(manifest.name, "A");
+        match load_served(root, "b").await {
+            Err(LoadError::Fetch(FetchError::NotFound(url))) => assert!(url.ends_with("place.con")),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[tokio::test]

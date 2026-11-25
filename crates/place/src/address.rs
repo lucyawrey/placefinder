@@ -1,10 +1,11 @@
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
-use crate::{MANIFEST, Text};
+use crate::Text;
 
-/// Where a Place lives: a folder holding its `place.con`, or a `place://` address. Either may
-/// instead name a `.con` manifest, whose folder is then the Place's base.
+/// Where a Place lives: a folder holding its `place.con` or `place.json`, or a `place://`
+/// address. Either may instead name a `.con` or `.json` manifest, whose folder is then the
+/// Place's base.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Address {
     Folder {
@@ -154,23 +155,19 @@ impl Address {
         address
     }
 
-    /// The manifest's file name: the one named, or `place.con`.
-    pub fn manifest(&self) -> &str {
-        self.named().unwrap_or(MANIFEST)
-    }
-
-    fn named(&self) -> Option<&str> {
+    /// The manifest's file name, if the address names one.
+    pub fn manifest(&self) -> Option<&str> {
         let last = match self {
             Address::Folder { path, .. } => path.file_name().and_then(|n| n.to_str()),
             Address::Served(served) => served.path.last().map(String::as_str),
         };
-        last.filter(|n| n.ends_with(".con"))
+        last.filter(|n| manifest_stem(n).is_some())
     }
 
     /// The folder holding the manifest.
     pub fn base(&self) -> Base {
         match self {
-            Address::Folder { path, .. } if self.named().is_some() => {
+            Address::Folder { path, .. } if self.manifest().is_some() => {
                 Base::Folder(path.parent().unwrap_or(Path::new("")).to_path_buf())
             }
             Address::Folder { path, .. } => Base::Folder(path.clone()),
@@ -210,10 +207,16 @@ impl fmt::Display for Address {
 impl Served {
     fn folder(&self) -> &[String] {
         match self.path.split_last() {
-            Some((last, folder)) if last.ends_with(".con") => folder,
+            Some((last, folder)) if manifest_stem(last).is_some() => folder,
             _ => &self.path,
         }
     }
+}
+
+/// A manifest file name without its `.con` or `.json`, or `None` if it isn't one.
+pub(crate) fn manifest_stem(name: &str) -> Option<&str> {
+    name.strip_suffix(".con")
+        .or_else(|| name.strip_suffix(".json"))
 }
 
 fn split_fragment(s: &str) -> (&str, Option<String>) {
@@ -351,20 +354,27 @@ mod tests {
     #[test]
     fn a_named_manifest_loads_from_its_folder() {
         let lobby = parse("place://a.com/garden/lobby.con");
-        assert_eq!(lobby.manifest(), "lobby.con");
+        assert_eq!(lobby.manifest(), Some("lobby.con"));
         assert_eq!(lobby.base(), Base::Http("https://a.com:443/garden/".into()));
         assert_eq!(
             lobby.resolve("pond").unwrap(),
             parse("place://a.com/garden/pond")
         );
         let folder = Address::folder(PathBuf::from("/x/garden/lobby.con"));
-        assert_eq!(folder.manifest(), "lobby.con");
+        assert_eq!(folder.manifest(), Some("lobby.con"));
         assert_eq!(folder.base(), Base::Folder(PathBuf::from("/x/garden")));
         assert_eq!(
             folder.resolve("pond").unwrap(),
             Address::folder(PathBuf::from("/x/garden/pond"))
         );
-        assert_eq!(parse("place://a.com/garden").manifest(), "place.con");
+        assert_eq!(parse("place://a.com/garden").manifest(), None);
+        let json = parse("place://a.com/garden/lobby.place.json");
+        assert_eq!(json.manifest(), Some("lobby.place.json"));
+        assert_eq!(json.base(), lobby.base());
+        assert_eq!(
+            json.resolve("pond").unwrap(),
+            lobby.resolve("pond").unwrap()
+        );
     }
 
     #[test]
