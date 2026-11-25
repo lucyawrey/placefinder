@@ -112,3 +112,22 @@ fn loads_a_named_manifest_only_if_marked_as_a_place() {
         Err(LoadError::NotAPlace(_))
     ));
 }
+
+#[test]
+fn reads_labels_and_portal_signs() {
+    let manifest = r#"version = 0
+name = "A"
+scene = "s.gltf"
+spawn = (0.0, 0.0, 0.0)
+portals = [
+    (target = "b", center = (0.0, 1.0, 0.0), size = (1.0, 2.0, 0.3), label = "To B")
+    (target = "c", center = (2.0, 1.0, 0.0), size = (1.0, 2.0, 0.3), show_label = false)
+]
+labels = [(text = "Hello", center = (0.0, 2.0, 0.0), yaw = 90.0)]"#;
+    let (_, place) = load(&temp_place("labels", &[("place.con", manifest)])).unwrap();
+    assert_eq!(place.portals[0].label.as_deref(), Some("To B"));
+    assert!(place.portals[0].show_label);
+    assert!(!place.portals[1].show_label);
+    assert_eq!(place.labels[0].text, "Hello");
+    assert_eq!((place.labels[0].yaw, place.labels[0].height), (90.0, 0.25));
+}

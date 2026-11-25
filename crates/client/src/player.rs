@@ -6,6 +6,7 @@ use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
 use motor::{Input, Settings, State};
 
+use crate::labels::TextQuad;
 use crate::places::{Arrived, Status, Traveling};
 use crate::portals::Portal;
 use crate::sky::{self, Gradient};
@@ -130,7 +131,7 @@ fn build_world(
     mut player: Single<&mut Player>,
     status: Res<Status>,
     meshes: Res<Assets<Mesh>>,
-    solids: Query<(Entity, &Mesh3d, &GlobalTransform), Without<Portal>>,
+    solids: Query<(Entity, &Mesh3d, &GlobalTransform), (Without<Portal>, Without<TextQuad>)>,
     parents: Query<&ChildOf>,
 ) {
     let (Collision::Spawned, Some(current)) = (&*collision, &status.current) else {

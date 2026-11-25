@@ -6,7 +6,15 @@ enum Sky {
   None
 }
 
-class Portal(target: String, center: (Float, Float, Float), size: (Float, Float, Float))
+class Portal(
+  target: String
+  center: (Float, Float, Float)
+  size: (Float, Float, Float)
+  label: String? = None
+  show_label: Bool = true
+)
+
+class Label(text: String, center: (Float, Float, Float), yaw: Float = 0.0, height: Float = 0.25)
 
 class Place {
   let version: Int
@@ -14,6 +22,7 @@ class Place {
   let scene: String
   let spawn: (Float, Float, Float)
   let portals: Portal[] = []
+  let labels: Label[] = []
   let capture_mouse: Bool = false
   let sky: Sky = Sky.Atmosphere
 }
