@@ -4,4 +4,4 @@ scene = "scene.gltf"
 capture_mouse = true
 sky = Sky.None
 spawn = (center = (0.0, 0.0, 8.0))
-portals = [(target = "..", center = (0.0, 1.0, 11.0), size = (1.5, 2.0, 0.3))]
+portals = [(target = "..#collision-test", name = "home", center = (0.0, 1.0, 11.0), size = (1.5, 2.0, 0.3))]

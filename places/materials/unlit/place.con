@@ -4,4 +4,4 @@ scene = "scene.glb"
 capture_mouse = true
 sky = Gradient
 spawn = (center = (0.0, -1.6, 6.28))
-portals = [(target = "../..", center = (0.0, -0.6, 9.28), size = (1.5, 2.0, 0.3))]
+portals = [(target = "../..#unlit", name = "home", center = (0.0, -0.6, 9.28), size = (1.5, 2.0, 0.3))]
