@@ -130,7 +130,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_missing_scene_over_http_is_not_found() {
-        let manifest = b"version = 0\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (0.0, 0.0, 0.0)";
+        let manifest = b"version = \"0.1.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
         let root = temp_root("no-scene", &[("a/place.con", manifest)]);
         let (base, manifest) = load_served(root, "a").await.unwrap();
         let result = tokio::task::spawn_blocking(move || base.fetch(&manifest.scene))

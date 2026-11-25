@@ -36,6 +36,7 @@ texts! {
     manifest_not_text,
     not_a_place,
     unknown_manifest_version,
+    duplicate_portal_name,
     scene_without_scene,
     go_button,
     load_failed,

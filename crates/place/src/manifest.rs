@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::Text;
 
-/// The manifest version this client reads.
-pub const VERSION: i64 = 0;
+/// The manifest version this client reads: manifests with the same `x.y` and any `z`.
+pub const VERSION: &str = "0.1.0";
 
 const CLASS: &str = include_str!("place.check");
 
@@ -15,11 +15,11 @@ pub type Point = [f64; 3];
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Manifest {
-    pub version: i64,
+    pub version: String,
     pub name: String,
     /// A glTF path relative to the Place.
     pub scene: String,
-    pub spawn: Point,
+    pub spawn: Spawn,
     pub portals: Vec<Portal>,
     pub labels: Vec<Label>,
     /// Whether clicking the scene captures the mouse, for looking around and walking.
@@ -38,11 +38,24 @@ pub enum Sky {
     None,
 }
 
+/// Where arrivals that don't come through a linked Portal start, and where falling respawns.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Spawn {
+    pub center: Point,
+    /// Degrees about the vertical axis, counter-clockwise from above; at 0 the player faces -Z.
+    pub yaw: f64,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Portal {
     pub target: String,
     pub center: Point,
     pub size: Point,
+    /// What other Portals' targets link to, as the fragment in `place#name`.
+    pub name: Option<String>,
+    /// Degrees about the vertical axis, counter-clockwise from above; at 0 the front, which
+    /// players walk in through, faces +Z.
+    pub yaw: f64,
     /// Replaces the target Place's name on the Portal's sign.
     pub label: Option<String>,
     pub show_label: bool,
@@ -52,7 +65,8 @@ pub struct Portal {
 pub struct Label {
     pub text: String,
     pub center: Point,
-    /// Degrees about the vertical axis; at 0 the text's front faces +Z.
+    /// Degrees about the vertical axis, counter-clockwise from above; at 0 the text's front
+    /// faces +Z.
     pub yaw: f64,
     /// The text's line height, in metres.
     pub height: f64,
@@ -61,7 +75,8 @@ pub struct Label {
 #[derive(Debug)]
 pub enum ManifestError {
     Invalid(String),
-    Version(i64),
+    Version(String),
+    DuplicatePortal(String),
 }
 
 impl fmt::Display for ManifestError {
@@ -72,18 +87,49 @@ impl fmt::Display for ManifestError {
                 let slots: [(&str, &dyn fmt::Display); 2] = [("version", v), ("reads", &VERSION)];
                 f.write_str(&Text::unknown_manifest_version.fill(&slots))
             }
+            ManifestError::DuplicatePortal(name) => {
+                f.write_str(&Text::duplicate_portal_name.fill(&[("name", name)]))
+            }
         }
     }
 }
 
 /// Also returns whether the file is marked as a Place by writing `Place(...)`.
 pub fn read(path: &str, text: &str) -> Result<(Manifest, bool), ManifestError> {
+    // Before the checked read, so a newer manifest gets the version message, not a parse error.
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Version {
+        Text(String),
+        /// Manifests before 0.1.0 had an integer version.
+        Number(i64),
+    }
+    #[derive(Deserialize)]
+    struct Versioned {
+        version: Version,
+    }
+    let versioned: Versioned = check_serde::from_str_unchecked(path, text)
+        .map_err(|e| ManifestError::Invalid(e.to_string()))?;
+    match versioned.version {
+        Version::Text(v) if same_minor(&v, VERSION) => {}
+        Version::Text(v) => return Err(ManifestError::Version(v)),
+        Version::Number(n) => return Err(ManifestError::Version(n.to_string())),
+    }
     let files = MemFiles(HashMap::from([("place/place.check".into(), CLASS.into())]));
     let (manifest, class): (Manifest, _) =
         check_serde::from_str_with_class(&files, "place/", "place", path, text, "place.Place")
             .map_err(|e| ManifestError::Invalid(e.to_string()))?;
-    if manifest.version != VERSION {
-        return Err(ManifestError::Version(manifest.version));
+    let names = manifest.portals.iter().filter_map(|p| p.name.as_ref());
+    for (i, name) in names.clone().enumerate() {
+        if names.clone().take(i).any(|n| n == name) {
+            return Err(ManifestError::DuplicatePortal(name.clone()));
+        }
     }
     Ok((manifest, class.as_deref() == Some("place.Place")))
+}
+
+/// Whether two `x.y.z` versions share `x.y`, the part that changes when manifests break.
+fn same_minor(a: &str, b: &str) -> bool {
+    let minor = |v: &str| v.rsplit_once('.').map(|(xy, _)| xy.to_string());
+    minor(a).is_some() && minor(a) == minor(b)
 }

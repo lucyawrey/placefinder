@@ -5,6 +5,7 @@ use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
 use bevy::world_serialization::WorldAssetRoot;
 use place::{Address, Base, LoadError, Manifest};
 
+use crate::portals::Crossing;
 use crate::source::{Bases, SOURCE};
 
 /// Loads Places and moves between them. Travel only swaps Places once the new one has fully
@@ -35,6 +36,8 @@ pub struct Traveling;
 pub struct Travel {
     pub target: String,
     pub from_portal: bool,
+    /// How the player stepped into the Portal, for coming out of a linked one.
+    pub crossing: Option<Crossing>,
 }
 
 /// The current Place changed.
@@ -42,6 +45,7 @@ pub struct Travel {
 pub struct Arrived {
     pub root: Entity,
     pub manifest: Manifest,
+    pub crossing: Option<Crossing>,
 }
 
 /// The current Place and what's happening to it, for the address bar to show.
@@ -60,7 +64,10 @@ pub struct Current {
 }
 
 #[derive(Component)]
-struct Fetching(Task<(Address, Result<(Base, Manifest), LoadError>)>);
+struct Fetching(
+    Task<(Address, Result<(Base, Manifest), LoadError>)>,
+    Option<Crossing>,
+);
 
 #[derive(Component)]
 struct Pending {
@@ -68,6 +75,7 @@ struct Pending {
     number: u32,
     manifest: Manifest,
     gltf: Handle<Gltf>,
+    crossing: Option<Crossing>,
 }
 
 fn start_travel(
@@ -81,6 +89,7 @@ fn start_travel(
     let Some(Travel {
         target,
         from_portal,
+        crossing,
     }) = requests.read().last()
     else {
         return;
@@ -109,7 +118,7 @@ fn start_travel(
         let result = place::load(&address);
         (address, result)
     });
-    commands.spawn(Fetching(task));
+    commands.spawn(Fetching(task, *crossing));
 }
 
 fn fetch_manifest(
@@ -138,6 +147,7 @@ fn fetch_manifest(
                         .with_settings(|s: &mut GltfLoaderSettings| s.load_cameras = false)
                         .load(path),
                     manifest,
+                    crossing: fetch.1,
                 });
             }
             Err(e) => fail(&mut status, e.to_string()),
@@ -202,6 +212,7 @@ fn finish_travel(
         arrived.write(Arrived {
             root,
             manifest: place.manifest.clone(),
+            crossing: place.crossing,
         });
     }
 }
@@ -282,6 +293,7 @@ pub(crate) mod tests {
         app.world_mut().write_message(Travel {
             target: target.into(),
             from_portal: false,
+            crossing: None,
         });
         app.update();
         let start = Instant::now();
@@ -313,7 +325,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_failed_load_keeps_the_current_place() {
-        let manifest = "version = 0\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (0.0, 0.0, 0.0)";
+        let manifest = "version = \"0.1.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
         let failing = [
             temp_place("missing-scene", &[("place.con", manifest)]),
             temp_place("invalid", &[("place.con", "name = 3")]),

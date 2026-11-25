@@ -147,6 +147,7 @@ fn submit(
         travel.write(Travel {
             target: text.value().to_string(),
             from_portal: false,
+            crossing: None,
         });
     }
 }
@@ -161,6 +162,7 @@ fn go(
         travel.write(Travel {
             target: field.value().to_string(),
             from_portal: false,
+            crossing: None,
         });
     }
 }

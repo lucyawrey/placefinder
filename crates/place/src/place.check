@@ -10,17 +10,21 @@ class Portal(
   target: String
   center: (Float, Float, Float)
   size: (Float, Float, Float)
+  name: String? = None
+  yaw: Float = 0.0
   label: String? = None
   show_label: Bool = true
 )
 
+class Spawn(center: (Float, Float, Float), yaw: Float = 0.0)
+
 class Label(text: String, center: (Float, Float, Float), yaw: Float = 0.0, height: Float = 0.25)
 
 class Place {
-  let version: Int
+  let version: String
   let name: String
   let scene: String
-  let spawn: (Float, Float, Float)
+  let spawn: Spawn
   let portals: Portal[] = []
   let labels: Label[] = []
   let capture_mouse: Bool = false

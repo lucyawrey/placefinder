@@ -138,6 +138,14 @@ pub struct Input {
 
 /// Places the player at `at`, lifted onto the top of any solid mesh `at` is inside.
 pub fn spawn(world: &World, at: Vec3) -> State {
+    State {
+        feet: lift(world, at),
+        ..State::at(at)
+    }
+}
+
+/// The point, raised out of any solid it's inside.
+pub fn lift(world: &World, at: Vec3) -> Vec3 {
     let mut feet = at;
     if let Some(hulls) = &world.hulls
         && hulls.contains_local_point(feet)
@@ -159,10 +167,7 @@ pub fn spawn(world: &World, at: Vec3) -> State {
             feet.y += hit.time_of_impact + SKIN;
         }
     }
-    State {
-        feet,
-        ..State::at(at)
-    }
+    feet
 }
 
 /// Advances the player by `dt` seconds.
