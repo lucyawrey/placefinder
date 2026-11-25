@@ -1,5 +1,5 @@
 version = 0
-name = "Collision test"
+name = "Collision Test"
 scene = "scene.gltf"
 capture_mouse = true
 sky = Sky.None

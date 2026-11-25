@@ -1,5 +1,5 @@
 version = 0
-name = "Punctual lights"
+name = "Punctual Lights"
 scene = "scene.glb"
 capture_mouse = true
 sky = Sky.None
