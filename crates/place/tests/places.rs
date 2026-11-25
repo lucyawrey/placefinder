@@ -128,6 +128,57 @@ fn refuses_files_outside_the_place_on_every_platform() {
     }
 }
 
+const JSON: &str =
+    r#"{"version": "0.1.0", "name": "J", "scene": "s.gltf", "spawn": {"center": [0, 1, 0]}}"#;
+
+#[test]
+fn a_folder_without_place_con_loads_place_json_with_defaults() {
+    let (_, manifest) = load(&temp_place("json", &[("place.json", JSON)])).unwrap();
+    assert_eq!(
+        (manifest.name.as_str(), manifest.spawn.center),
+        ("J", [0.0, 1.0, 0.0])
+    );
+    assert_eq!(manifest.portals, []);
+}
+
+#[test]
+fn place_con_wins_over_place_json() {
+    let address = temp_place(
+        "both",
+        &[("place.con", &versioned("\"0.1.0\"")), ("place.json", JSON)],
+    );
+    assert_eq!(load(&address).unwrap().1.name, "A");
+}
+
+#[test]
+fn reads_json_as_exporters_write_it_and_refuses_it_like_con() {
+    let portal = r#"{"version": "0.1.0", "name": "J", "scene": "s.gltf", "spawn": {"center": [0, 0, 0]},
+        "portals": [{"target": "../b", "center": [1, 2, 3], "size": [1, 2, 1]}]}"#;
+    let folder = temp_place(
+        "json-named",
+        &[
+            ("lobby.place.json", portal),
+            ("plain.json", JSON),
+            ("wrong.place.json", &JSON.replace("[0, 1, 0]", "\"up\"")),
+            ("newer.place.json", &JSON.replace("0.1.0", "0.2.0")),
+        ],
+    );
+    let named = |file: &str| load(&folder.resolve(file).unwrap());
+    assert_eq!(
+        named("lobby.place.json").unwrap().1.portals[0].center,
+        [1.0, 2.0, 3.0]
+    );
+    assert!(matches!(named("plain.json"), Err(LoadError::NotAPlace(_))));
+    assert!(matches!(
+        named("wrong.place.json"),
+        Err(LoadError::Manifest(ManifestError::Invalid(_)))
+    ));
+    assert!(matches!(
+        named("newer.place.json"),
+        Err(LoadError::Manifest(ManifestError::Version(_)))
+    ));
+}
+
 #[test]
 fn loads_a_named_manifest_only_if_marked_as_a_place() {
     let fields =

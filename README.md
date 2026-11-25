@@ -35,6 +35,8 @@ Open a Place from a folder directly:
 cargo run -p client -- places
 ```
 
+A Place's folder holds its manifest as `place.con`, or as `place.json` instead.
+
 Serve a folder of Places on a small HTTP server, then open one over HTTP:
 
 ```
