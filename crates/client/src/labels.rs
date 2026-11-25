@@ -35,7 +35,7 @@ impl WorldText {
             text: text.into(),
             height,
             color: Color::WHITE,
-            background: Some(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+            background: Some(Color::srgba(0.0, 0.0, 0.0, 0.8)),
             two_sided: true,
         }
     }
@@ -60,6 +60,8 @@ const FONT_PX: f32 = 48.0;
 const PADDING_PX: f32 = 8.0;
 /// Bevy's default line height, relative to the font size.
 const LINE_PER_FONT: f32 = 1.2;
+/// How much brighter than white signs draw, so white text is still white after tonemapping.
+const BRIGHTNESS: f32 = 3.0;
 const MAX_TEXTURE_WIDTH: f32 = 4096.0;
 
 /// A sign's full height for a given line height, panel padding included.
@@ -153,6 +155,7 @@ fn start_drawing(
             .add_child(text)
             .id();
         let material = materials.add(StandardMaterial {
+            base_color: Color::linear_rgb(BRIGHTNESS, BRIGHTNESS, BRIGHTNESS),
             base_color_texture: Some(image.clone()),
             unlit: true,
             // The UI blends onto a transparent clear, which leaves premultiplied colour.
