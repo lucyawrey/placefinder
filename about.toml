@@ -26,6 +26,12 @@ license = "MIT"
 path = "LICENSE"
 checksum = "6c2593c193aa8028e029bec3f352ea53090154f1894d2333423d34f1c3600538"
 
+[check-runtime.clarify]
+license = "MIT"
+[[check-runtime.clarify.git]]
+path = "LICENSE"
+checksum = "6c2593c193aa8028e029bec3f352ea53090154f1894d2333423d34f1c3600538"
+
 [check-serde.clarify]
 license = "MIT"
 [[check-serde.clarify.git]]
