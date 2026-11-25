@@ -62,7 +62,7 @@ const PADDING_PX: f32 = 8.0;
 const LINE_PER_FONT: f32 = 1.2;
 /// How much brighter than white signs draw, so white text is still white after tonemapping.
 const BRIGHTNESS: f32 = 3.0;
-const MAX_TEXTURE_WIDTH: f32 = 4096.0;
+const MAX_TEXTURE_SIDE: f32 = 4096.0;
 
 /// A sign's full height for a given line height, panel padding included.
 pub fn sign_height(line_height: f32) -> f32 {
@@ -215,7 +215,7 @@ fn draw(
         }
         let panel_size = panel.size / drawing.scale;
         let metres_per_px = world_text.height / (text.size.y / drawing.scale);
-        let scale = (MAX_TEXTURE_WIDTH / panel_size.x).min(1.0);
+        let scale = (MAX_TEXTURE_SIDE / panel_size.max_element()).min(1.0);
         let pixels = (panel_size * scale).ceil().as_uvec2();
         // A new image rather than a resized one, which the material keeps sampling empty.
         drawing.image = images.add(Image::new_target_texture(
@@ -234,7 +234,9 @@ fn draw(
                 handle: drawing.image.clone(),
                 scale_factor: scale,
             }));
-        let mesh = meshes.add(Rectangle::from_size(panel_size * metres_per_px));
+        let mesh = meshes.add(Rectangle::from_size(
+            pixels.as_vec2() / scale * metres_per_px,
+        ));
         for &quad in &drawing.quads {
             commands.entity(quad).insert(Mesh3d(mesh.clone()));
         }

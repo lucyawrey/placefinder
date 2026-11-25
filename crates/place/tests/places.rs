@@ -127,6 +127,7 @@ labels = [(text = "Hello", center = (0.0, 2.0, 0.0), yaw = 90.0)]"#;
     let (_, place) = load(&temp_place("labels", &[("place.con", manifest)])).unwrap();
     assert_eq!(place.portals[0].label.as_deref(), Some("To B"));
     assert!(place.portals[0].show_label);
+    assert_eq!(place.portals[1].label, None);
     assert!(!place.portals[1].show_label);
     assert_eq!(place.labels[0].text, "Hello");
     assert_eq!((place.labels[0].yaw, place.labels[0].height), (90.0, 0.25));

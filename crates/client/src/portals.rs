@@ -25,12 +25,11 @@ pub struct Portal {
 
 /// A sign showing its Portal's target until the target Place's name arrives.
 #[derive(Component)]
-struct TakesName(String);
+struct TakesName(Address);
 
 /// Fetches a Portal target's manifest for its name.
 #[derive(Component)]
 struct NameFetch {
-    target: String,
     address: Address,
     task: Option<Task<Option<String>>>,
 }
@@ -50,17 +49,21 @@ fn first_label(portal: &manifest::Portal) -> Option<(&str, bool)> {
     })
 }
 
-/// Each target whose name a sign needs, once.
-fn names_to_fetch(portals: &[manifest::Portal]) -> Vec<&str> {
-    let mut targets = Vec::new();
-    for portal in portals {
-        if first_label(portal).is_some_and(|(_, takes_name)| takes_name)
-            && !targets.contains(&portal.target.as_str())
-        {
-            targets.push(portal.target.as_str());
+/// The address a sign takes its name from, if it takes one and its target resolves.
+fn name_source(portal: &manifest::Portal, here: &Address) -> Option<Address> {
+    let (_, takes_name) = first_label(portal)?;
+    takes_name.then(|| here.resolve(&portal.target).ok())?
+}
+
+/// Each address whose name a sign needs, once.
+fn names_to_fetch(portals: &[manifest::Portal], here: &Address) -> Vec<Address> {
+    let mut addresses = Vec::new();
+    for address in portals.iter().filter_map(|p| name_source(p, here)) {
+        if !addresses.contains(&address) {
+            addresses.push(address);
         }
     }
-    targets
+    addresses
 }
 
 fn spawn_portals(
@@ -71,6 +74,9 @@ fn spawn_portals(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for arrived in arrived.read() {
+        let Some(current) = &status.current else {
+            continue;
+        };
         let material = materials.add(StandardMaterial {
             base_color: Color::srgba(0.4, 0.7, 1.0, 0.5),
             emissive: LinearRgba::rgb(0.5, 1.2, 2.5),
@@ -92,7 +98,7 @@ fn spawn_portals(
                     ChildOf(arrived.root),
                 ))
                 .id();
-            if let Some((text, takes_name)) = first_label(portal) {
+            if let Some((text, _)) = first_label(portal) {
                 let y = size.y / 2.0 + LABEL_GAP + sign_height(LABEL_HEIGHT) / 2.0;
                 // Faces along the Portal's thinner side, like a sign over a doorway.
                 let yaw = if size.z <= size.x {
@@ -105,22 +111,16 @@ fn spawn_portals(
                     Transform::from_xyz(0.0, y, 0.0).with_rotation(Quat::from_rotation_y(yaw)),
                     ChildOf(entity),
                 ));
-                if takes_name {
-                    sign.insert(TakesName(portal.target.clone()));
+                if let Some(address) = name_source(portal, &current.address) {
+                    sign.insert(TakesName(address));
                 }
             }
         }
-        let Some(current) = &status.current else {
-            continue;
-        };
-        for target in names_to_fetch(&arrived.manifest.portals) {
-            if let Ok(address) = current.address.resolve(target) {
-                commands.entity(arrived.root).with_child(NameFetch {
-                    target: target.into(),
-                    address,
-                    task: None,
-                });
-            }
+        for address in names_to_fetch(&arrived.manifest.portals, &current.address) {
+            commands.entity(arrived.root).with_child(NameFetch {
+                address,
+                task: None,
+            });
         }
     }
 }
@@ -153,7 +153,7 @@ fn fetch_names(
             continue;
         };
         for (takes_name, mut text) in &mut signs {
-            if takes_name.0 == fetch.target {
+            if takes_name.0 == fetch.address {
                 text.text = name.clone();
             }
         }
@@ -210,13 +210,15 @@ mod tests {
 
     #[test]
     fn fetches_each_needed_name_once() {
+        let here = Address::Folder("/places/home".into());
         let portals = [
             portal("a", None, true),
-            portal("a", None, true),
+            portal("./a", None, true),
             portal("b", Some("To B"), true),
             portal("c", None, false),
             portal("d", None, true),
         ];
-        assert_eq!(names_to_fetch(&portals), ["a", "d"]);
+        let expected = ["a", "d"].map(|t| here.resolve(t).unwrap());
+        assert_eq!(names_to_fetch(&portals, &here), expected);
     }
 }
