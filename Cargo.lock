@@ -2261,18 +2261,10 @@ dependencies = [
 [[package]]
 name = "check-core"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=7af8fb8#7af8fb84ad6776a43e88e749e5ec5c8a55c13339"
-dependencies = [
- "check-syntax 0.1.0 (git+https://github.com/lucyawrey/check?rev=7af8fb8)",
-]
-
-[[package]]
-name = "check-core"
-version = "0.1.0"
 source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedcfb2e854379e6cff1bb49c"
 dependencies = [
  "check-runtime",
- "check-syntax 0.1.0 (git+https://github.com/lucyawrey/check?rev=b8be2a9)",
+ "check-syntax",
  "indexmap",
  "serde_json",
  "stacker",
@@ -2286,28 +2278,13 @@ source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedc
 [[package]]
 name = "check-serde"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=7af8fb8#7af8fb84ad6776a43e88e749e5ec5c8a55c13339"
-dependencies = [
- "check-core 0.1.0 (git+https://github.com/lucyawrey/check?rev=7af8fb8)",
- "check-syntax 0.1.0 (git+https://github.com/lucyawrey/check?rev=7af8fb8)",
- "serde",
-]
-
-[[package]]
-name = "check-serde"
-version = "0.1.0"
 source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedcfb2e854379e6cff1bb49c"
 dependencies = [
- "check-core 0.1.0 (git+https://github.com/lucyawrey/check?rev=b8be2a9)",
- "check-syntax 0.1.0 (git+https://github.com/lucyawrey/check?rev=b8be2a9)",
+ "check-core",
+ "check-syntax",
  "serde",
  "serde_json",
 ]
-
-[[package]]
-name = "check-syntax"
-version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=7af8fb8#7af8fb84ad6776a43e88e749e5ec5c8a55c13339"
 
 [[package]]
 name = "check-syntax"
@@ -2333,8 +2310,8 @@ dependencies = [
  "axum",
  "base64",
  "bevy",
- "check-core 0.1.0 (git+https://github.com/lucyawrey/check?rev=7af8fb8)",
- "check-serde 0.1.0 (git+https://github.com/lucyawrey/check?rev=7af8fb8)",
+ "check-core",
+ "check-serde",
  "image",
  "motor",
  "place",
@@ -4990,8 +4967,8 @@ checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
 name = "place"
 version = "0.1.0"
 dependencies = [
- "check-core 0.1.0 (git+https://github.com/lucyawrey/check?rev=b8be2a9)",
- "check-serde 0.1.0 (git+https://github.com/lucyawrey/check?rev=b8be2a9)",
+ "check-core",
+ "check-serde",
  "serde",
  "ureq",
 ]

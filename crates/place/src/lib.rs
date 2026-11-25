@@ -9,7 +9,7 @@ pub use manifest::{Manifest, Sky};
 
 use fetch::FetchError;
 
-/// The manifest file inside every Place.
+/// The manifest file a Place folder is read from first.
 pub const MANIFEST: &str = "place.con";
 /// Read when a Place's folder has no `MANIFEST`.
 pub const MANIFEST_JSON: &str = "place.json";

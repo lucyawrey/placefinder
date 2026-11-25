@@ -19,8 +19,8 @@ bevy = { version = "0.20.1", features = [
     "pbr_transmission_textures",
     "system_clipboard",
 ] }
-check-core = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
-check-serde = { git = "https://github.com/lucyawrey/check", rev = "7af8fb8" }
+check-core = { git = "https://github.com/lucyawrey/check", rev = "b8be2a9" }
+check-serde = { git = "https://github.com/lucyawrey/check", rev = "b8be2a9" }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 motor = { version = "0.1.0", path = "../motor" }
 place = { version = "0.1.0", path = "../place" }
