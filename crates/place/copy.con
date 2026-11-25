@@ -20,6 +20,7 @@ load_failed = "[error shown when a Place fails to load, with the reason] {reason
 
 // Command line
 port_too_large = "[a port number that's too large: {port}]"
+vr_unavailable = "[--vr given, but no headset or OpenXR runtime was found, so the client runs on the desktop]"
 
 // Developer MCP
 mcp_listen_failed = "[the MCP server couldn't listen on port {port}: {error}]"

@@ -41,6 +41,7 @@ texts! {
     go_button,
     load_failed,
     port_too_large,
+    vr_unavailable,
     mcp_listen_failed,
     mcp_replaced,
     mcp_timed_out,

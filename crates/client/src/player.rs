@@ -4,6 +4,7 @@ use bevy::pbr::ScreenSpaceTransmission;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy::world_serialization::WorldInstanceReady;
+use bevy_mod_xr::session::session_running;
 use motor::{Input, Settings, State};
 
 use crate::labels::TextQuad;
@@ -22,7 +23,12 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 Update,
                 // Same frame as arrival, before the scene spawns and marks itself ready.
-                (place_on_arrival, build_world, look, read_input, show)
+                (
+                    place_on_arrival.in_set(Arriving),
+                    build_world,
+                    (look, read_input).run_if(not(session_running)),
+                    show.in_set(Showing),
+                )
                     .chain()
                     .after(Traveling),
             )
@@ -51,7 +57,32 @@ impl Player {
     pub fn velocity(&self) -> Vec3 {
         self.state.velocity
     }
+
+    pub fn feet(&self) -> Vec3 {
+        self.state.feet
+    }
+
+    /// Moves the feet and turns the player at once, with no slide drawn between.
+    pub fn teleport(&mut self, transform: &mut Transform, feet: Vec3, yaw: f32) {
+        self.state.feet = feet;
+        self.previous = feet;
+        self.yaw = yaw;
+        transform.rotation = Quat::from_rotation_y(yaw);
+    }
+
+    /// The direction for the next tick, at most 1 long.
+    pub fn wish(&mut self, wish: Vec3) {
+        self.input.wish = wish;
+    }
 }
+
+/// Where `place_on_arrival` runs: the player is on the arrival point after it.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Arriving;
+
+/// Where `show` runs, drawing the player from their feet.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Showing;
 
 #[derive(Resource, Default)]
 pub struct Movement(pub Settings);
@@ -67,7 +98,7 @@ enum Collision {
 }
 
 #[derive(Component)]
-struct Eye;
+pub struct Eye;
 
 /// The camera's height above the feet.
 const EYE: f32 = 1.6;
@@ -88,7 +119,7 @@ fn spawn(mut commands: Commands) {
         ))
         .with_child((
             Eye,
-            Camera3d::default(),
+            sky::camera(),
             ScreenSpaceTransmission::default(),
             Transform::from_xyz(0.0, EYE, 0.0),
         ));

@@ -8,7 +8,8 @@ use bevy::light::{
 use bevy::pbr::AtmosphereSettings;
 use bevy::prelude::*;
 use bevy::render::render_resource::{
-    Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension,
+    Extent3d, TextureDimension, TextureFormat, TextureUsages, TextureViewDescriptor,
+    TextureViewDimension,
 };
 use place::Sky;
 
@@ -37,6 +38,17 @@ fn setup(
         media.add(ScatteringMedium::earth(256, 256)),
     ));
     commands.insert_resource(Gradient(images.add(gradient())));
+}
+
+/// A camera that can show any sky. The atmosphere samples depth, and Bevy adds that usage
+/// itself only to cameras it sees change after the atmosphere is extracted, which misses some
+/// cameras with `--vr`.
+pub fn camera() -> Camera3d {
+    Camera3d {
+        depth_texture_usages: (TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING)
+            .into(),
+        ..default()
+    }
 }
 
 /// Shows `sky` behind the camera's view and lights the scene with it.
