@@ -8,7 +8,7 @@ use motor::{Input, Settings, State};
 
 use crate::labels::TextQuad;
 use crate::places::{Arrived, Status, Traveling};
-use crate::portals::Portal;
+use crate::portals::{self, Portal, Pose};
 use crate::sky::{self, Gradient};
 
 /// A first-person player that walks on and bumps into the current Place's meshes.
@@ -22,7 +22,7 @@ impl Plugin for PlayerPlugin {
             .add_systems(
                 Update,
                 // Same frame as arrival, before the scene spawns and marks itself ready.
-                (place_at_spawn, build_world, look, read_input, show)
+                (place_on_arrival, build_world, look, read_input, show)
                     .chain()
                     .after(Traveling),
             )
@@ -40,6 +40,17 @@ pub struct Player {
     /// Where the feet were before the last tick, for drawing between ticks.
     previous: Vec3,
     input: Input,
+}
+
+impl Player {
+    /// Radians about the vertical axis; at 0 the player faces -Z.
+    pub fn yaw(&self) -> f32 {
+        self.yaw
+    }
+
+    pub fn velocity(&self) -> Vec3 {
+        self.state.velocity
+    }
 }
 
 #[derive(Resource, Default)]
@@ -83,22 +94,45 @@ fn spawn(mut commands: Commands) {
         ));
 }
 
-fn place_at_spawn(
+/// Arrives through the Portal the address's fragment names, else at the spawn. Only turns the
+/// player about the vertical axis and keeps their pitch, as VR must.
+fn place_on_arrival(
     mut arrived: MessageReader<Arrived>,
     mut player: Single<(&mut Transform, &mut Player)>,
     mut collision: ResMut<Collision>,
     eye: Single<Entity, With<Eye>>,
     gradient: Res<Gradient>,
+    movement: Res<Movement>,
     mut commands: Commands,
 ) {
-    if let Some(arrived) = arrived.read().last() {
-        sky::show(&mut commands.entity(*eye), arrived.manifest.sky, &gradient);
-        let spawn = Vec3::from_array(arrived.manifest.spawn.map(|v| v as f32));
-        player.0.translation = spawn;
-        player.1.state = State::at(spawn);
-        player.1.previous = spawn;
-        *collision = Collision::None;
-    }
+    let Some(arrived) = arrived.read().last() else {
+        return;
+    };
+    sky::show(&mut commands.entity(*eye), arrived.manifest.sky, &gradient);
+    let spawn = &arrived.manifest.spawn;
+    let spawn_feet = Vec3::from_array(spawn.center.map(|v| v as f32));
+    let pose = arrived
+        .address
+        .fragment()
+        .and_then(|name| {
+            portals::arrival(&arrived.manifest, name, arrived.crossing, movement.0.radius)
+        })
+        .unwrap_or(Pose {
+            feet: spawn_feet,
+            yaw: (spawn.yaw as f32).to_radians(),
+            velocity: Vec3::ZERO,
+        });
+    let (transform, player) = &mut *player;
+    transform.translation = pose.feet;
+    transform.rotation = Quat::from_rotation_y(pose.yaw);
+    player.yaw = pose.yaw;
+    player.state = State {
+        feet: pose.feet,
+        velocity: pose.velocity,
+        ..State::at(spawn_feet)
+    };
+    player.previous = pose.feet;
+    *collision = Collision::None;
 }
 
 /// Lights a scene that brings no lights of its own with a sun, which leaves with the Place.
@@ -147,7 +181,7 @@ fn build_world(
         }
     }
     let world = motor::World::new(parts);
-    player.state = motor::spawn(&world, player.state.spawn);
+    player.state.feet = motor::lift(&world, player.state.feet);
     player.previous = player.state.feet;
     *collision = Collision::Built(Box::new(world));
 }

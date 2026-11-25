@@ -241,6 +241,7 @@ fn answer(
                     travel.write(Travel {
                         target,
                         from_portal: false,
+                        crossing: None,
                     });
                     loads.push((address.to_string(), reply));
                 }
@@ -566,6 +567,7 @@ mod tests {
                     app.world_mut().write_message(Travel {
                         target: home.clone(),
                         from_portal: false,
+                        crossing: None,
                     });
                 }
             },
@@ -589,7 +591,7 @@ mod tests {
         let scene = &scene["structuredContent"];
         assert_eq!(scene["address"], current(&app));
         assert_eq!(scene["manifest"]["name"], "Home");
-        assert_eq!(scene["manifest"]["portals"][0]["target"], "meadow");
+        assert_eq!(scene["manifest"]["portals"][0]["target"], "meadow#home");
         let names: Vec<&str> = scene["nodes"]
             .as_array()
             .unwrap()

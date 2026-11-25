@@ -4,7 +4,7 @@ scene = "scene.gltf"
 capture_mouse = true
 spawn = (center = (0.0, 0.0, 4.0))
 portals = [
-    (target = "meadow", center = (0.0, 1.0, -6.0), size = (1.5, 2.0, 0.3))
+    (target = "meadow#home", name = "meadow", center = (0.0, 1.0, -6.0), size = (1.5, 2.0, 0.3))
     (target = "collision-test", center = (4.0, 1.0, -6.0), size = (1.5, 2.0, 0.3))
     (target = "materials/anisotropy", center = (-8.0, 1.0, -4.0), size = (0.3, 2.0, 1.5))
     (target = "materials/clearcoat", center = (-8.0, 1.0, -1.0), size = (0.3, 2.0, 1.5))

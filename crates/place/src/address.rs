@@ -307,7 +307,10 @@ mod tests {
             assert_eq!(address.fragment(), Some("lobby"));
             assert_eq!(address.base(), address.without_fragment().base());
         }
-        assert_eq!(parse("place://a.com/garden#lobby").to_string(), "place://a.com/garden#lobby");
+        assert_eq!(
+            parse("place://a.com/garden#lobby").to_string(),
+            "place://a.com/garden#lobby"
+        );
     }
 
     #[test]

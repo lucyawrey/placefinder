@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
-use place::{Address, manifest};
+use place::{Address, Manifest, manifest};
 
 use crate::labels::{WorldText, sign_height};
 use crate::places::{Arrived, Status, Travel};
@@ -21,6 +21,57 @@ pub struct Portal {
     half_size: Vec3,
     /// Off until the player has been outside it once, so arriving inside one doesn't bounce back.
     armed: bool,
+}
+
+/// The player's feet, facing and velocity in the frame of the Portal they stepped into.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Crossing {
+    pub offset: Vec3,
+    pub yaw: f32,
+    pub velocity: Vec3,
+}
+
+/// Where and how the player stands on arrival.
+#[derive(Debug, PartialEq)]
+pub struct Pose {
+    pub feet: Vec3,
+    /// Radians about the vertical axis; at 0 the player faces -Z.
+    pub yaw: f32,
+    pub velocity: Vec3,
+}
+
+/// A Portal's centre and turn, in which its front faces +Z.
+fn frame(portal: &manifest::Portal) -> Transform {
+    Transform::from_translation(Vec3::from_array(portal.center.map(|v| v as f32)))
+        .with_rotation(Quat::from_rotation_y((portal.yaw as f32).to_radians()))
+}
+
+/// Arriving through the Portal named `name`: as the player crossed into the Portal they left,
+/// or, with no crossing, just past its exit side facing away, as if they had walked through.
+/// `None` when the Place has no Portal by that name.
+pub fn arrival(
+    manifest: &Manifest,
+    name: &str,
+    crossing: Option<Crossing>,
+    body_radius: f32,
+) -> Option<Pose> {
+    let portal = manifest
+        .portals
+        .iter()
+        .find(|p| p.name.as_deref() == Some(name))?;
+    let frame = frame(portal);
+    let yaw = (portal.yaw as f32).to_radians();
+    let size = Vec3::from_array(portal.size.map(|v| v as f32));
+    let crossing = crossing.unwrap_or(Crossing {
+        offset: Vec3::new(0.0, -size.y / 2.0, -(size.z / 2.0 + body_radius)),
+        yaw: 0.0,
+        velocity: Vec3::ZERO,
+    });
+    Some(Pose {
+        feet: frame.transform_point(crossing.offset),
+        yaw: yaw + crossing.yaw,
+        velocity: frame.rotation * crossing.velocity,
+    })
 }
 
 /// A sign showing its Portal's target until the target Place's name arrives.
@@ -52,7 +103,9 @@ fn first_label(portal: &manifest::Portal) -> Option<(&str, bool)> {
 /// The address a sign takes its name from, if it takes one and its target resolves.
 fn name_source(portal: &manifest::Portal, here: &Address) -> Option<Address> {
     let (_, takes_name) = first_label(portal)?;
-    takes_name.then(|| here.resolve(&portal.target).ok())?
+    takes_name
+        .then(|| here.resolve(&portal.target).ok())?
+        .map(|address| address.without_fragment())
 }
 
 /// Each address whose name a sign needs, once.
@@ -94,21 +147,15 @@ fn spawn_portals(
                     },
                     Mesh3d(meshes.add(Cuboid::from_size(size))),
                     MeshMaterial3d(material.clone()),
-                    Transform::from_translation(Vec3::from_array(portal.center.map(|v| v as f32))),
+                    frame(portal),
                     ChildOf(arrived.root),
                 ))
                 .id();
             if let Some((text, _)) = first_label(portal) {
                 let y = size.y / 2.0 + LABEL_GAP + sign_height(LABEL_HEIGHT) / 2.0;
-                // Faces along the Portal's thinner side, like a sign over a doorway.
-                let yaw = if size.z <= size.x {
-                    0.0
-                } else {
-                    std::f32::consts::FRAC_PI_2
-                };
                 let mut sign = commands.spawn((
                     WorldText::sign(text, LABEL_HEIGHT),
-                    Transform::from_xyz(0.0, y, 0.0).with_rotation(Quat::from_rotation_y(yaw)),
+                    Transform::from_xyz(0.0, y, 0.0),
                     ChildOf(entity),
                 ));
                 if let Some(address) = name_source(portal, &current.address) {
@@ -162,21 +209,31 @@ fn fetch_names(
 
 fn enter(
     mut portals: Query<(&mut Portal, &GlobalTransform)>,
-    player: Single<&Transform, With<Player>>,
+    player: Single<(&Transform, &Player)>,
     movement: Res<Movement>,
     mut travel: MessageWriter<Travel>,
 ) {
+    let (transform, player) = *player;
     let body = &movement.0;
     let half_size = Vec3::new(body.radius, body.height / 2.0, body.radius);
-    let center = player.translation + Vec3::Y * half_size.y;
     for (mut portal, global) in &mut portals {
-        let gap = (center - global.translation()).abs();
-        let inside = gap.cmplt(portal.half_size + half_size).all();
+        let to_portal = global.compute_transform().compute_affine().inverse();
+        let feet = to_portal.transform_point3(transform.translation);
+        // The body as a box in the Portal's frame: close enough for a trigger.
+        let inside = (feet + Vec3::Y * half_size.y)
+            .abs()
+            .cmplt(portal.half_size + half_size)
+            .all();
         if inside && portal.armed {
             portal.armed = false;
             travel.write(Travel {
                 target: portal.target.clone(),
                 from_portal: true,
+                crossing: Some(Crossing {
+                    offset: feet,
+                    yaw: player.yaw() - global.rotation().to_euler(EulerRot::YXZ).0,
+                    velocity: to_portal.transform_vector3(player.velocity()),
+                }),
             });
         } else if !inside {
             portal.armed = true;
@@ -193,6 +250,8 @@ mod tests {
             target: target.into(),
             center: [0.0; 3],
             size: [1.0; 3],
+            name: None,
+            yaw: 0.0,
             label: label.map(Into::into),
             show_label,
         }
@@ -220,5 +279,61 @@ mod tests {
         ];
         let expected = ["a", "d"].map(|t| here.resolve(t).unwrap());
         assert_eq!(names_to_fetch(&portals, &here), expected);
+    }
+
+    /// A manifest with one Portal named `gate` at `center`, turned `yaw` degrees.
+    fn linked(center: [f64; 3], yaw: f64) -> Manifest {
+        let mut gate = portal("x", None, true);
+        gate.name = Some("gate".into());
+        gate.center = center;
+        gate.size = [1.5, 2.0, 0.4];
+        gate.yaw = yaw;
+        Manifest {
+            version: manifest::VERSION.into(),
+            name: "A".into(),
+            scene: "s.gltf".into(),
+            spawn: manifest::Spawn {
+                center: [0.0; 3],
+                yaw: 0.0,
+            },
+            portals: vec![gate],
+            labels: vec![],
+            capture_mouse: false,
+            sky: place::Sky::None,
+        }
+    }
+
+    fn close(a: Vec3, b: Vec3) -> bool {
+        a.distance(b) < 1e-5
+    }
+
+    #[test]
+    fn a_crossing_comes_out_of_the_linked_portal_turned_with_it() {
+        let crossing = Crossing {
+            offset: Vec3::new(0.2, -1.0, 0.1),
+            yaw: 0.3,
+            velocity: Vec3::new(0.0, 0.0, -2.0),
+        };
+        let pose = arrival(&linked([10.0, 1.0, 0.0], 90.0), "gate", Some(crossing), 0.3).unwrap();
+        // Turned a quarter counter-clockwise, the Portal's -Z (the way through) is world -X.
+        assert!(
+            close(pose.feet, Vec3::new(10.1, 0.0, -0.2)),
+            "{:?}",
+            pose.feet
+        );
+        assert!((pose.yaw - (std::f32::consts::FRAC_PI_2 + 0.3)).abs() < 1e-5);
+        assert!(close(pose.velocity, Vec3::new(-2.0, 0.0, 0.0)));
+    }
+
+    #[test]
+    fn a_typed_name_arrives_just_past_the_exit_side_facing_away() {
+        let pose = arrival(&linked([0.0, 1.0, 5.0], 0.0), "gate", None, 0.3).unwrap();
+        assert!(
+            close(pose.feet, Vec3::new(0.0, 0.0, 4.5)),
+            "{:?}",
+            pose.feet
+        );
+        assert_eq!((pose.yaw, pose.velocity), (0.0, Vec3::ZERO));
+        assert_eq!(arrival(&linked([0.0; 3], 0.0), "other", None, 0.3), None);
     }
 }

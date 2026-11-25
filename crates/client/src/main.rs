@@ -81,6 +81,7 @@ fn main() {
     app.world_mut().write_message(places::Travel {
         target,
         from_portal: false,
+        crossing: None,
     });
     app.run();
 }

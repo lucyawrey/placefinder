@@ -3,4 +3,4 @@ name = "Meadow"
 scene = "scene.glb"
 capture_mouse = true
 spawn = (center = (0.0, 0.0, 4.0))
-portals = [(target = "..", center = (0.0, 1.0, -6.0), size = (1.5, 2.0, 0.3))]
+portals = [(target = "..#meadow", name = "home", center = (0.0, 1.0, -6.0), size = (1.5, 2.0, 0.3))]
