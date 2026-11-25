@@ -119,7 +119,7 @@ fn spawn(mut commands: Commands) {
         ))
         .with_child((
             Eye,
-            Camera3d::default(),
+            sky::camera(),
             ScreenSpaceTransmission::default(),
             Transform::from_xyz(0.0, EYE, 0.0),
         ));

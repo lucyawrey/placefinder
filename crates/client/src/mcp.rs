@@ -267,7 +267,7 @@ fn answer(
                 ));
                 let camera = commands
                     .spawn((
-                        Camera3d::default(),
+                        sky::camera(),
                         ScreenSpaceTransmission::default(),
                         RenderTarget::from(image.clone()),
                         eye.compute_transform(),

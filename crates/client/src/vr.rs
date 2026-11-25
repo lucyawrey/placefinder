@@ -186,7 +186,7 @@ fn camera_added(
     mut commands: Commands,
 ) {
     let mut camera = commands.entity(added.entity);
-    camera.insert(ScreenSpaceTransmission::default());
+    camera.insert((sky::camera(), ScreenSpaceTransmission::default()));
     if let Some(current) = &status.current {
         sky::show(&mut camera, current.manifest.sky, &gradient);
     }
