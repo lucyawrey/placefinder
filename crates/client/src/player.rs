@@ -8,7 +8,7 @@ use motor::{Input, Settings, State};
 
 use crate::labels::TextQuad;
 use crate::places::{Arrived, Status, Traveling};
-use crate::portals::{self, Portal, Pose};
+use crate::portals::{self, Portal};
 use crate::sky::{self, Gradient};
 
 /// A first-person player that walks on and bumps into the current Place's meshes.
@@ -98,6 +98,7 @@ fn spawn(mut commands: Commands) {
 /// player about the vertical axis and keeps their pitch, as VR must.
 fn place_on_arrival(
     mut arrived: MessageReader<Arrived>,
+    status: Res<Status>,
     mut player: Single<(&mut Transform, &mut Player)>,
     mut collision: ResMut<Collision>,
     eye: Single<Entity, With<Eye>>,
@@ -109,19 +110,14 @@ fn place_on_arrival(
         return;
     };
     sky::show(&mut commands.entity(*eye), arrived.manifest.sky, &gradient);
-    let spawn = &arrived.manifest.spawn;
-    let spawn_feet = Vec3::from_array(spawn.center.map(|v| v as f32));
-    let pose = arrived
-        .address
-        .fragment()
-        .and_then(|name| {
-            portals::arrival(&arrived.manifest, name, arrived.crossing, movement.0.radius)
-        })
-        .unwrap_or(Pose {
-            feet: spawn_feet,
-            yaw: (spawn.yaw as f32).to_radians(),
-            velocity: Vec3::ZERO,
-        });
+    let spawn_feet = Vec3::from_array(arrived.manifest.spawn.center.map(|v| v as f32));
+    let fragment = status.current.as_ref().and_then(|c| c.address.fragment());
+    let pose = portals::arrival(
+        &arrived.manifest,
+        fragment,
+        arrived.crossing,
+        movement.0.radius,
+    );
     let (transform, player) = &mut *player;
     transform.translation = pose.feet;
     transform.rotation = Quat::from_rotation_y(pose.yaw);
@@ -202,15 +198,20 @@ fn triangles(mesh: &Mesh, global: &GlobalTransform) -> Option<(Vec<Vec3>, Vec<[u
         return None;
     };
     let affine = global.affine();
-    let points = positions.iter().map(|&p| affine.transform_point3(p.into())).collect();
+    let points = positions
+        .iter()
+        .map(|&p| affine.transform_point3(p.into()))
+        .collect();
     let indices: Vec<u32> = match mesh.indices() {
         Some(indices) => indices.iter().map(|i| i as u32).collect(),
         None => (0..positions.len() as u32).collect(),
     };
     let mirrored = affine.matrix3.determinant() < 0.0;
-    let triangles = indices.as_chunks::<3>().0.iter().map(|&[a, b, c]| {
-        if mirrored { [a, c, b] } else { [a, b, c] }
-    });
+    let triangles = indices
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|&[a, b, c]| if mirrored { [a, c, b] } else { [a, b, c] });
     Some((points, triangles.collect()))
 }
 

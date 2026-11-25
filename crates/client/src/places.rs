@@ -44,7 +44,6 @@ pub struct Travel {
 #[derive(Message)]
 pub struct Arrived {
     pub root: Entity,
-    pub address: Address,
     pub manifest: Manifest,
     pub crossing: Option<Crossing>,
 }
@@ -212,7 +211,6 @@ fn finish_travel(
         status.loading = None;
         arrived.write(Arrived {
             root,
-            address: place.address.clone(),
             manifest: place.manifest.clone(),
             crossing: place.crossing,
         });

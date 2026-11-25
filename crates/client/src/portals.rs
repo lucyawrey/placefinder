@@ -11,7 +11,12 @@ pub struct PortalsPlugin;
 
 impl Plugin for PortalsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (spawn_portals, fetch_names, enter));
+        // A Portal's GlobalTransform is only right after PostUpdate, so `enter` must never see
+        // one spawned this frame.
+        app.add_systems(
+            Update,
+            (enter.before(spawn_portals), spawn_portals, fetch_names),
+        );
     }
 }
 
@@ -19,8 +24,32 @@ impl Plugin for PortalsPlugin {
 pub struct Portal {
     target: String,
     half_size: Vec3,
-    /// Off until the player has been outside it once, so arriving inside one doesn't bounce back.
-    armed: bool,
+    arming: Arming,
+}
+
+/// Keeps a Portal from sending the player straight back the way they came.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Arming {
+    /// Off until the player is outside it.
+    Waiting,
+    /// The Portal the player came out of: off until they have been inside it and left, since a
+    /// crossing from a deeper Portal can land them just in front of it.
+    Leaving,
+    Armed,
+}
+
+impl Arming {
+    /// Whether the player, `inside` the Portal or not, sets it off now.
+    fn update(&mut self, inside: bool) -> bool {
+        let (next, travel) = match (*self, inside) {
+            (Arming::Armed, true) => (Arming::Waiting, true),
+            (Arming::Leaving, true) => (Arming::Waiting, false),
+            (Arming::Waiting, false) => (Arming::Armed, false),
+            (state, _) => (state, false),
+        };
+        *self = next;
+        travel
+    }
 }
 
 /// The player's feet, facing and velocity in the frame of the Portal they stepped into.
@@ -46,19 +75,55 @@ fn frame(portal: &manifest::Portal) -> Transform {
         .with_rotation(Quat::from_rotation_y((portal.yaw as f32).to_radians()))
 }
 
+/// How a body with half size `body` crosses into the Portal at `portal`, or `None` while it is
+/// outside.
+fn crossing(
+    portal: &Transform,
+    half_size: Vec3,
+    body: Vec3,
+    feet: Vec3,
+    yaw: f32,
+    velocity: Vec3,
+) -> Option<Crossing> {
+    let to_portal = portal.compute_affine().inverse();
+    let offset = to_portal.transform_point3(feet);
+    // The body as a box in the Portal's frame: close enough for a trigger.
+    let inside = (offset + Vec3::Y * body.y)
+        .abs()
+        .cmplt(half_size + body)
+        .all();
+    inside.then(|| Crossing {
+        offset,
+        yaw: yaw - portal.rotation.to_euler(EulerRot::YXZ).0,
+        velocity: to_portal.transform_vector3(velocity),
+    })
+}
+
+fn named<'a>(manifest: &'a Manifest, name: Option<&str>) -> Option<&'a manifest::Portal> {
+    name.and_then(|name| {
+        manifest
+            .portals
+            .iter()
+            .find(|p| p.name.as_deref() == Some(name))
+    })
+}
+
 /// Arriving through the Portal named `name`: as the player crossed into the Portal they left,
 /// or, with no crossing, just past its exit side facing away, as if they had walked through.
-/// `None` when the Place has no Portal by that name.
+/// At the spawn when the Place has no Portal by that name.
 pub fn arrival(
     manifest: &Manifest,
-    name: &str,
+    name: Option<&str>,
     crossing: Option<Crossing>,
     body_radius: f32,
-) -> Option<Pose> {
-    let portal = manifest
-        .portals
-        .iter()
-        .find(|p| p.name.as_deref() == Some(name))?;
+) -> Pose {
+    let Some(portal) = named(manifest, name) else {
+        return Pose {
+            feet: Vec3::from_array(manifest.spawn.center.map(|v| v as f32)),
+            yaw: (manifest.spawn.yaw as f32).to_radians(),
+            velocity: Vec3::ZERO,
+        };
+    };
     let frame = frame(portal);
     let yaw = (portal.yaw as f32).to_radians();
     let size = Vec3::from_array(portal.size.map(|v| v as f32));
@@ -67,11 +132,11 @@ pub fn arrival(
         yaw: 0.0,
         velocity: Vec3::ZERO,
     });
-    Some(Pose {
+    Pose {
         feet: frame.transform_point(crossing.offset),
         yaw: yaw + crossing.yaw,
         velocity: frame.rotation * crossing.velocity,
-    })
+    }
 }
 
 /// A sign showing its Portal's target until the target Place's name arrives.
@@ -130,6 +195,8 @@ fn spawn_portals(
         let Some(current) = &status.current else {
             continue;
         };
+        let came_out_of = named(&arrived.manifest, current.address.fragment())
+            .filter(|_| arrived.crossing.is_some());
         let material = materials.add(StandardMaterial {
             base_color: Color::srgba(0.4, 0.7, 1.0, 0.5),
             emissive: LinearRgba::rgb(0.5, 1.2, 2.5),
@@ -143,7 +210,11 @@ fn spawn_portals(
                     Portal {
                         target: portal.target.clone(),
                         half_size: size / 2.0,
-                        armed: false,
+                        arming: if came_out_of == Some(portal) {
+                            Arming::Leaving
+                        } else {
+                            Arming::Waiting
+                        },
                     },
                     Mesh3d(meshes.add(Cuboid::from_size(size))),
                     MeshMaterial3d(material.clone()),
@@ -215,28 +286,22 @@ fn enter(
 ) {
     let (transform, player) = *player;
     let body = &movement.0;
-    let half_size = Vec3::new(body.radius, body.height / 2.0, body.radius);
+    let body = Vec3::new(body.radius, body.height / 2.0, body.radius);
     for (mut portal, global) in &mut portals {
-        let to_portal = global.compute_transform().compute_affine().inverse();
-        let feet = to_portal.transform_point3(transform.translation);
-        // The body as a box in the Portal's frame: close enough for a trigger.
-        let inside = (feet + Vec3::Y * half_size.y)
-            .abs()
-            .cmplt(portal.half_size + half_size)
-            .all();
-        if inside && portal.armed {
-            portal.armed = false;
+        let crossing = crossing(
+            &global.compute_transform(),
+            portal.half_size,
+            body,
+            transform.translation,
+            player.yaw(),
+            player.velocity(),
+        );
+        if portal.arming.update(crossing.is_some()) {
             travel.write(Travel {
                 target: portal.target.clone(),
                 from_portal: true,
-                crossing: Some(Crossing {
-                    offset: feet,
-                    yaw: player.yaw() - global.rotation().to_euler(EulerRot::YXZ).0,
-                    velocity: to_portal.transform_vector3(player.velocity()),
-                }),
+                crossing,
             });
-        } else if !inside {
-            portal.armed = true;
         }
     }
 }
@@ -314,7 +379,12 @@ mod tests {
             yaw: 0.3,
             velocity: Vec3::new(0.0, 0.0, -2.0),
         };
-        let pose = arrival(&linked([10.0, 1.0, 0.0], 90.0), "gate", Some(crossing), 0.3).unwrap();
+        let pose = arrival(
+            &linked([10.0, 1.0, 0.0], 90.0),
+            Some("gate"),
+            Some(crossing),
+            0.3,
+        );
         // Turned a quarter counter-clockwise, the Portal's -Z (the way through) is world -X.
         assert!(
             close(pose.feet, Vec3::new(10.1, 0.0, -0.2)),
@@ -327,13 +397,76 @@ mod tests {
 
     #[test]
     fn a_typed_name_arrives_just_past_the_exit_side_facing_away() {
-        let pose = arrival(&linked([0.0, 1.0, 5.0], 0.0), "gate", None, 0.3).unwrap();
+        let pose = arrival(&linked([0.0, 1.0, 5.0], 0.0), Some("gate"), None, 0.3);
         assert!(
             close(pose.feet, Vec3::new(0.0, 0.0, 4.5)),
             "{:?}",
             pose.feet
         );
         assert_eq!((pose.yaw, pose.velocity), (0.0, Vec3::ZERO));
-        assert_eq!(arrival(&linked([0.0; 3], 0.0), "other", None, 0.3), None);
+    }
+
+    #[test]
+    fn an_unknown_or_missing_name_arrives_at_the_spawn_facing_its_yaw() {
+        let mut place = linked([0.0; 3], 0.0);
+        place.spawn = manifest::Spawn {
+            center: [1.0, 0.0, 2.0],
+            yaw: 180.0,
+        };
+        for name in [Some("other"), None] {
+            let pose = arrival(&place, name, None, 0.3);
+            assert_eq!(
+                (pose.feet, pose.velocity),
+                (Vec3::new(1.0, 0.0, 2.0), Vec3::ZERO)
+            );
+            assert!((pose.yaw - std::f32::consts::PI).abs() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn crossing_into_a_portal_and_out_of_its_link_keeps_the_crossing() {
+        let (from, to) = (linked([0.0, 1.0, 0.0], 0.0), linked([10.0, 1.0, 0.0], 90.0));
+        let body = Vec3::new(0.3, 0.9, 0.3);
+        let half_size = Vec3::new(0.75, 1.0, 0.2);
+        let gate = |place: &Manifest| frame(&place.portals[0]);
+        let entered = crossing(
+            &gate(&from),
+            half_size,
+            body,
+            Vec3::new(0.2, 0.0, 0.1),
+            0.3,
+            Vec3::new(0.0, 0.0, -2.0),
+        )
+        .unwrap();
+        let pose = arrival(&to, Some("gate"), Some(entered), body.x);
+        let back = crossing(
+            &gate(&to),
+            half_size,
+            body,
+            pose.feet,
+            pose.yaw,
+            pose.velocity,
+        )
+        .unwrap();
+        assert!(close(back.offset, entered.offset) && close(back.velocity, entered.velocity));
+        assert!((back.yaw - entered.yaw).abs() < 1e-5);
+        assert_eq!(
+            crossing(
+                &gate(&from),
+                half_size,
+                body,
+                Vec3::new(0.0, 0.0, 2.0),
+                0.0,
+                Vec3::ZERO
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn the_portal_the_player_came_out_of_stays_off_until_they_have_left_it() {
+        let mut arming = Arming::Leaving;
+        let steps = [false, true, true, false, true].map(|inside| arming.update(inside));
+        assert_eq!(steps, [false, false, false, false, true]);
     }
 }
