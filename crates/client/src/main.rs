@@ -13,19 +13,25 @@ mod portals;
 mod settings;
 mod sky;
 mod source;
+mod vr;
 
 use bevy::asset::AssetMetaCheck;
 use bevy::log::{DEFAULT_FILTER, LogPlugin};
 use bevy::prelude::*;
 
-/// `client [--mcp [port]] [address]`: opens the Placefinder prototype at the address if one is
-/// given, else at the home Place, serving the developer MCP if `--mcp` is.
+/// `client [--vr] [--mcp [port]] [address]`: opens the Placefinder prototype at the address if one
+/// is given, else at the home Place, in a headset if `--vr` is given and serving the developer MCP
+/// if `--mcp` is.
 fn main() {
     #[cfg(all(windows, not(debug_assertions)))]
     attach_console();
     let mut args = std::env::args().skip(1).peekable();
-    let (mut mcp_port, mut address) = (None, None);
+    let (mut mcp_port, mut address, mut vr) = (None, None, false);
     while let Some(arg) = args.next() {
+        if arg == "--vr" {
+            vr = true;
+            continue;
+        }
         if arg != "--mcp" {
             address = Some(arg);
             continue;
@@ -45,8 +51,13 @@ fn main() {
         // Before `LogPlugin`, whose `custom_layer` reads it.
         app.init_resource::<mcp::Logs>();
     }
+    let plugins = if vr {
+        bevy_mod_openxr::add_xr_plugins(DefaultPlugins)
+    } else {
+        DefaultPlugins.build()
+    };
     app.add_plugins(
-        DefaultPlugins
+        plugins
             .set(AssetPlugin {
                 meta_check: AssetMetaCheck::Never,
                 ..default()
@@ -73,6 +84,9 @@ fn main() {
         sky::SkyPlugin,
         address_bar::AddressBarPlugin,
     ));
+    if vr {
+        app.add_plugins(vr::VrPlugin);
+    }
     if let Some(port) = mcp_port {
         app.add_plugins(mcp::McpPlugin { port });
     }

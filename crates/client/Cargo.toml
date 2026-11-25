@@ -19,10 +19,13 @@ bevy = { version = "0.20.1", features = [
     "pbr_transmission_textures",
     "system_clipboard",
 ] }
+bevy_mod_openxr = { git = "https://github.com/lucyawrey/bevy_oxr", rev = "e33b525" }
+bevy_mod_xr = { git = "https://github.com/lucyawrey/bevy_oxr", rev = "e33b525" }
 check-core = { git = "https://github.com/lucyawrey/check", rev = "b8be2a9" }
 check-serde = { git = "https://github.com/lucyawrey/check", rev = "b8be2a9" }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 motor = { version = "0.1.0", path = "../motor" }
+openxr = "0.22.0"
 place = { version = "0.1.0", path = "../place" }
 rmcp = { version = "3.11.0", features = ["transport-streamable-http-server"] }
 serde = { version = "1", features = ["derive"] }

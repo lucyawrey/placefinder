@@ -29,7 +29,7 @@ use rmcp::{tool, tool_router};
 use tokio::sync::oneshot;
 
 use crate::places::{Status, Travel, Traveling};
-use crate::player::Player;
+use crate::player::{Eye, Player};
 use crate::sky::{self, Gradient};
 
 pub const PORT: u16 = 7414;
@@ -301,7 +301,7 @@ struct Scene<'w, 's> {
     parents: Query<'w, 's, &'static ChildOf>,
     nodes: Query<'w, 's, (&'static Name, &'static GlobalTransform)>,
     player: Query<'w, 's, &'static GlobalTransform, With<Player>>,
-    camera: Query<'w, 's, &'static GlobalTransform, (With<Camera3d>, Without<Offscreen>)>,
+    camera: Query<'w, 's, &'static GlobalTransform, With<Eye>>,
 }
 
 impl Scene<'_, '_> {

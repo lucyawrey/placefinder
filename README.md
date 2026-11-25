@@ -37,6 +37,12 @@ cargo run -p client -- places
 
 A Place's folder holds its manifest as `place.con`, or as `place.json` instead.
 
+Play in a VR headset with `--vr`, which needs an OpenXR runtime (such as SteamVR, Monado or WiVRn). Without one, the client runs on the desktop.
+
+```
+cargo run -p client -- --vr
+```
+
 Serve a folder of Places on a small HTTP server, then open one over HTTP:
 
 ```
