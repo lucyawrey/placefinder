@@ -8,9 +8,7 @@ use bevy_mod_openxr::resources::OxrInstance;
 use bevy_mod_openxr::session::OxrSession;
 use bevy_mod_openxr::spaces::OxrSpaceLocationFlags;
 use bevy_mod_xr::camera::XrCamera;
-use bevy_mod_xr::session::{
-    XrPreDestroySession, XrSessionCreated, XrTrackingRoot, session_available,
-};
+use bevy_mod_xr::session::{XrSessionCreated, XrTrackingRoot, session_available};
 use openxr::{Action, ActionSet, Path, Posef, ReferenceSpaceType, Vector2f};
 use std::f32::consts::PI;
 
@@ -29,8 +27,7 @@ impl Plugin for VrPlugin {
             .add_systems(Startup, create_actions.run_if(session_available))
             .add_systems(PostStartup, follow_player)
             .add_systems(OxrSendActionBindings, suggest_bindings)
-            .add_systems(XrSessionCreated, (start, show_eye::<false>))
-            .add_systems(XrPreDestroySession, show_eye::<true>)
+            .add_systems(XrSessionCreated, start)
             .add_systems(
                 PreUpdate,
                 sync_actions
@@ -41,7 +38,7 @@ impl Plugin for VrPlugin {
                 Update,
                 (
                     arrive,
-                    (recenter, turn, walk).run_if(openxr_session_running),
+                    (recenter, turn, walk, mirror).run_if(openxr_session_running),
                 )
                     .chain()
                     .after(Arriving)
@@ -170,8 +167,13 @@ fn start(
     recenter.0 = true;
 }
 
-fn show_eye<const ACTIVE: bool>(mut eye: Single<&mut Camera, With<Eye>>) {
-    eye.is_active = ACTIVE;
+/// Shows the headset's view in the desktop window: `Eye` and the tracking root are both
+/// children of the player, so the head's pose on the floor is also the eye's.
+fn mirror(
+    head: Single<&Transform, With<Head>>,
+    mut eye: Single<&mut Transform, (With<Eye>, Without<Head>)>,
+) {
+    **eye = **head;
 }
 
 fn sync_actions(actions: Res<Actions>, mut sync: MessageWriter<OxrSyncActionSet>) {
