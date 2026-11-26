@@ -91,7 +91,7 @@ fn versioned(version: &str) -> String {
 
 #[test]
 fn refuses_other_manifest_versions_but_reads_any_patch() {
-    for version in ["\"0.2.0\"", "\"1.1.0\"", "0"] {
+    for version in ["\"0.1.0\"", "\"1.2.0\"", "0"] {
         let address = temp_place("version", &[("place.con", &versioned(version))]);
         assert!(
             matches!(
@@ -101,7 +101,7 @@ fn refuses_other_manifest_versions_but_reads_any_patch() {
             "{version}"
         );
     }
-    let address = temp_place("patch", &[("place.con", &versioned("\"0.1.7\""))]);
+    let address = temp_place("patch", &[("place.con", &versioned("\"0.2.7\""))]);
     assert!(load(&address).is_ok());
 }
 
@@ -109,12 +109,56 @@ fn refuses_other_manifest_versions_but_reads_any_patch() {
 fn refuses_two_portals_with_one_name() {
     let portal =
         "(target = \"b\", center = (0.0, 1.0, 0.0), size = (1.0, 2.0, 0.3), name = \"gate\")";
-    let manifest = format!("{}\nportals = [{portal}, {portal}]", versioned("\"0.1.0\""));
+    let manifest = format!("{}\nportals = [{portal}, {portal}]", versioned("\"0.2.0\""));
     let address = temp_place("duplicate", &[("place.con", &manifest)]);
     assert!(matches!(
         load(&address),
         Err(LoadError::Manifest(ManifestError::DuplicatePortal(name))) if name == "gate"
     ));
+}
+
+#[test]
+fn a_ui_only_place_loads_and_ignores_capture_mouse() {
+    let manifest = "version = \"0.2.0\"\nname = \"A\"\nui = \"page.cml\"\ncapture_mouse = true";
+    let (_, manifest) = load(&temp_place("ui", &[("place.con", manifest)])).unwrap();
+    assert_eq!(manifest.ui.as_deref(), Some("page.cml"));
+    assert!(!manifest.capture_mouse);
+}
+
+#[test]
+fn refuses_both_or_neither_of_scene_and_ui_and_scene_fields_with_ui() {
+    let ui = "version = \"0.2.0\"\nname = \"A\"\nui = \"page.cml\"";
+    let portal = "(target = \"b\", center = (0.0, 1.0, 0.0), size = (1.0, 2.0, 0.3))";
+    let cases = [
+        (
+            format!("{}\nui = \"page.cml\"", versioned("\"0.2.0\"")),
+            "both",
+        ),
+        ("version = \"0.2.0\"\nname = \"A\"".into(), "neither"),
+        (
+            "version = \"0.2.0\"\nname = \"A\"\nscene = \"s.gltf\"".into(),
+            "no spawn",
+        ),
+        (format!("{ui}\nspawn = (center = (0.0, 0.0, 0.0))"), "spawn"),
+        (format!("{ui}\nportals = [{portal}]"), "portals"),
+        (
+            format!("{ui}\nlabels = [(text = \"Hi\", center = (0.0, 0.0, 0.0))]"),
+            "labels",
+        ),
+    ];
+    for (manifest, case) in cases {
+        let error = match load(&temp_place("refused", &[("place.con", &manifest)])) {
+            Err(LoadError::Manifest(e)) => e,
+            other => panic!("{case}: {:?}", other.map(|_| ())),
+        };
+        let expected = match case {
+            "both" => matches!(error, ManifestError::SceneAndUi),
+            "neither" => matches!(error, ManifestError::NoSceneOrUi),
+            "no spawn" => matches!(error, ManifestError::NoSpawn),
+            field => matches!(error, ManifestError::NeedsScene(f) if f == field),
+        };
+        assert!(expected, "{case}: {error:?}");
+    }
 }
 
 #[test]
@@ -129,13 +173,13 @@ fn refuses_files_outside_the_place_on_every_platform() {
 }
 
 const JSON: &str =
-    r#"{"version": "0.1.0", "name": "J", "scene": "s.gltf", "spawn": {"center": [0, 1, 0]}}"#;
+    r#"{"version": "0.2.0", "name": "J", "scene": "s.gltf", "spawn": {"center": [0, 1, 0]}}"#;
 
 #[test]
 fn a_folder_without_place_con_loads_place_json_with_defaults() {
     let (_, manifest) = load(&temp_place("json", &[("place.json", JSON)])).unwrap();
     assert_eq!(
-        (manifest.name.as_str(), manifest.spawn.center),
+        (manifest.name.as_str(), manifest.spawn.unwrap().center),
         ("J", [0.0, 1.0, 0.0])
     );
     assert_eq!(manifest.portals, []);
@@ -145,14 +189,14 @@ fn a_folder_without_place_con_loads_place_json_with_defaults() {
 fn place_con_wins_over_place_json() {
     let address = temp_place(
         "both",
-        &[("place.con", &versioned("\"0.1.0\"")), ("place.json", JSON)],
+        &[("place.con", &versioned("\"0.2.0\"")), ("place.json", JSON)],
     );
     assert_eq!(load(&address).unwrap().1.name, "A");
 }
 
 #[test]
 fn reads_json_as_exporters_write_it_and_refuses_it_like_con() {
-    let portal = r#"{"version": "0.1.0", "name": "J", "scene": "s.gltf", "spawn": {"center": [0, 0, 0]},
+    let portal = r#"{"version": "0.2.0", "name": "J", "scene": "s.gltf", "spawn": {"center": [0, 0, 0]},
         "portals": [{"target": "../b", "center": [1, 2, 3], "size": [1, 2, 1]}]}"#;
     let folder = temp_place(
         "json-named",
@@ -160,7 +204,7 @@ fn reads_json_as_exporters_write_it_and_refuses_it_like_con() {
             ("lobby.place.json", portal),
             ("plain.json", JSON),
             ("wrong.place.json", &JSON.replace("[0, 1, 0]", "\"up\"")),
-            ("newer.place.json", &JSON.replace("0.1.0", "0.2.0")),
+            ("newer.place.json", &JSON.replace("0.2.0", "0.3.0")),
         ],
     );
     let named = |file: &str| load(&folder.resolve(file).unwrap());
@@ -182,7 +226,7 @@ fn reads_json_as_exporters_write_it_and_refuses_it_like_con() {
 #[test]
 fn loads_a_named_manifest_only_if_marked_as_a_place() {
     let fields =
-        "version = \"0.1.0\", name = \"A\", scene = \"s.gltf\", spawn = (center = (0.0, 0.0, 0.0))";
+        "version = \"0.2.0\", name = \"A\", scene = \"s.gltf\", spawn = (center = (0.0, 0.0, 0.0))";
     let (written, plain) = (format!("Place({fields})"), format!("({fields})"));
     let folder = temp_place(
         "named",
@@ -204,7 +248,7 @@ fn loads_a_named_manifest_only_if_marked_as_a_place() {
 
 #[test]
 fn reads_labels_and_portal_signs() {
-    let manifest = r#"version = "0.1.0"
+    let manifest = r#"version = "0.2.0"
 name = "A"
 scene = "s.gltf"
 spawn = (center = (0.0, 0.0, 0.0))

@@ -1,0 +1,13 @@
+<Box padding=L gap=M width=Fill height=Fill>
+  <Text font_size=Xl>[page heading]</Text>
+  <Text><Span>[sentence leading into a link] </Span><Link target="..#ui-test">[link home]</Link><Span>. [sentence leading into a second link] </Span><Link target="../meadow#home">[link to Meadow]</Link></Text>
+  <Box direction=Row gap=M align=Center>
+    <Button>[button label]</Button>
+    <Box pressable=true focusable=true padding=M background=Surface radius=S>
+      <Text>[pressable box label]</Text>
+    </Box>
+    <Link target="..">[standalone link home]</Link>
+  </Box>
+  <TextInput value="[text input value]" width=Px(320)/>
+  <Image src="icon.png" width=Px(96) height=Px(96)/>
+</Box>

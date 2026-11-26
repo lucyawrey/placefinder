@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::Text;
 
 /// The manifest version this client reads: manifests with the same `x.y` and any `z`.
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.2.0";
 
 const CLASS: &str = include_str!("place.check");
 
@@ -17,9 +17,12 @@ pub type Point = [f64; 3];
 pub struct Manifest {
     pub version: String,
     pub name: String,
-    /// A glTF path relative to the Place.
-    pub scene: String,
-    pub spawn: Spawn,
+    /// A glTF path relative to the Place. A Place has a scene or a `ui`, never both.
+    pub scene: Option<String>,
+    /// Set exactly when `scene` is.
+    pub spawn: Option<Spawn>,
+    /// A `.cml` path relative to the Place, which the Place shows instead of a scene.
+    pub ui: Option<String>,
     pub portals: Vec<Portal>,
     pub labels: Vec<Label>,
     /// Whether clicking the scene captures the mouse, for looking around and walking.
@@ -77,6 +80,11 @@ pub enum ManifestError {
     Invalid(String),
     Version(String),
     DuplicatePortal(String),
+    SceneAndUi,
+    NoSceneOrUi,
+    NoSpawn,
+    /// A field only a Place with a scene can have.
+    NeedsScene(&'static str),
 }
 
 impl fmt::Display for ManifestError {
@@ -89,6 +97,12 @@ impl fmt::Display for ManifestError {
             }
             ManifestError::DuplicatePortal(name) => {
                 f.write_str(&Text::duplicate_portal_name.fill(&[("name", name)]))
+            }
+            ManifestError::SceneAndUi => f.write_str(Text::scene_and_ui.get()),
+            ManifestError::NoSceneOrUi => f.write_str(Text::no_scene_or_ui.get()),
+            ManifestError::NoSpawn => f.write_str(Text::no_spawn.get()),
+            ManifestError::NeedsScene(field) => {
+                f.write_str(&Text::field_needs_scene.fill(&[("field", field)]))
             }
         }
     }
@@ -116,13 +130,30 @@ pub fn read(path: &str, text: &str) -> Result<(Manifest, bool), ManifestError> {
         Version::Number(n) => return Err(ManifestError::Version(n.to_string())),
     }
     let files = MemFiles(HashMap::from([("place/place.check".into(), CLASS.into())]));
-    let (manifest, class): (Manifest, _) =
+    let (mut manifest, class): (Manifest, _) =
         check_serde::from_str_with_class(&files, "place/", "place", path, text, "place.Place")
             .map_err(|e| ManifestError::Invalid(e.to_string()))?;
     let names = manifest.portals.iter().filter_map(|p| p.name.as_ref());
     for (i, name) in names.clone().enumerate() {
         if names.clone().take(i).any(|n| n == name) {
             return Err(ManifestError::DuplicatePortal(name.clone()));
+        }
+    }
+    match (&manifest.scene, &manifest.ui) {
+        (Some(_), Some(_)) => return Err(ManifestError::SceneAndUi),
+        (None, None) => return Err(ManifestError::NoSceneOrUi),
+        (Some(_), None) if manifest.spawn.is_none() => return Err(ManifestError::NoSpawn),
+        (Some(_), None) => {}
+        (None, Some(_)) => {
+            let needs_scene = [
+                ("spawn", manifest.spawn.is_some()),
+                ("portals", !manifest.portals.is_empty()),
+                ("labels", !manifest.labels.is_empty()),
+            ];
+            if let Some((field, _)) = needs_scene.iter().find(|(_, set)| *set) {
+                return Err(ManifestError::NeedsScene(field));
+            }
+            manifest.capture_mouse = false;
         }
     }
     Ok((manifest, class.as_deref() == Some("place.Place")))

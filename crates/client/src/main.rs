@@ -72,6 +72,7 @@ fn main() {
         labels::LabelsPlugin,
         sky::SkyPlugin,
         address_bar::AddressBarPlugin,
+        ui::UiPlugin,
     ));
     if let Some(port) = mcp_port {
         app.add_plugins(mcp::McpPlugin { port });

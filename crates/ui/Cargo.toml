@@ -1,0 +1,12 @@
+[package]
+name = "ui"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+accesskit = { version = "0.24", default-features = false }
+bevy = "0.20.1"
+check-core = { git = "https://github.com/lucyawrey/check", rev = "6894432" }
+check-serde = { git = "https://github.com/lucyawrey/check", rev = "6894432" }
+serde = { version = "1", features = ["derive"] }
