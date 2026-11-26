@@ -3,8 +3,10 @@ use bevy::gltf::{Gltf, GltfLoaderSettings};
 use bevy::prelude::*;
 use bevy::tasks::{AsyncComputeTaskPool, Task, block_on, poll_once};
 use bevy::world_serialization::WorldAssetRoot;
-use place::{Address, Base, LoadError, Manifest};
+use place::{Address, Base, Manifest};
+use ui::{FollowLink, Tree, UiRoot};
 
+use crate::address_bar::HEIGHT;
 use crate::portals::Crossing;
 use crate::source::{Bases, SOURCE};
 
@@ -19,7 +21,7 @@ impl Plugin for PlacesPlugin {
             .init_resource::<Status>()
             .add_systems(
                 Update,
-                (start_travel, fetch_manifest, finish_travel)
+                (follow_links, start_travel, fetch_manifest, finish_travel)
                     .chain()
                     .in_set(Traveling),
             );
@@ -63,19 +65,35 @@ pub struct Current {
     pub root: Entity,
 }
 
-#[derive(Component)]
-struct Fetching(
-    Task<(Address, Result<(Base, Manifest), LoadError>)>,
-    Option<Crossing>,
-);
+/// A UI-only Place's tree comes with its manifest.
+type Loaded = Result<(Base, Manifest, Option<Tree>), String>;
 
 #[derive(Component)]
-struct Pending {
+struct Fetching(Task<(Address, Loaded)>, Option<Crossing>);
+
+/// A Place on its way in.
+struct Visit {
     address: Address,
     number: u32,
     manifest: Manifest,
-    gltf: Handle<Gltf>,
     crossing: Option<Crossing>,
+}
+
+#[derive(Component)]
+struct Pending {
+    visit: Visit,
+    gltf: Handle<Gltf>,
+}
+
+/// Links travel as Portals do, from the current Place.
+fn follow_links(mut links: MessageReader<FollowLink>, mut travel: MessageWriter<Travel>) {
+    for link in links.read() {
+        travel.write(Travel {
+            target: link.target.clone(),
+            from_portal: true,
+            crossing: None,
+        });
+    }
 }
 
 fn start_travel(
@@ -110,15 +128,32 @@ fn start_travel(
     }
     for (entity, place) in &pending {
         commands.entity(entity).despawn();
-        bases.remove(place.number);
+        bases.remove(place.visit.number);
     }
     status.loading = Some(address.to_string());
     status.error = None;
     let task = AsyncComputeTaskPool::get().spawn(async move {
-        let result = place::load(&address);
+        let result = load(&address);
         (address, result)
     });
     commands.spawn(Fetching(task, *crossing));
+}
+
+fn load(address: &Address) -> Loaded {
+    let (base, manifest) = place::load(address).map_err(|e| e.to_string())?;
+    let Some(path) = &manifest.ui else {
+        return Ok((base, manifest, None));
+    };
+    let bytes = base.fetch(path).map_err(|e| e.to_string())?;
+    let text = String::from_utf8(bytes).map_err(|_| place::Text::manifest_not_text.get())?;
+    let tree = ui::read(path, &text).map_err(|e| match e {
+        ui::ReadError::Invalid(e) => e,
+        ui::ReadError::Misplaced(kind) => {
+            place::Text::element_misplaced.fill(&[("element", &format!("{kind:?}"))])
+        }
+        ui::ReadError::OutsidePlace(src) => place::Text::file_outside_place.fill(&[("path", &src)]),
+    })?;
+    Ok((base, manifest, Some(tree)))
 }
 
 fn fetch_manifest(
@@ -126,6 +161,7 @@ fn fetch_manifest(
     mut fetching: Query<(Entity, &mut Fetching)>,
     mut status: ResMut<Status>,
     mut next_number: Local<u32>,
+    mut arrived: MessageWriter<Arrived>,
     bases: Res<Bases>,
     assets: Res<AssetServer>,
 ) {
@@ -134,24 +170,60 @@ fn fetch_manifest(
             continue;
         };
         commands.entity(entity).despawn();
-        match result {
-            Ok((base, manifest)) => {
-                *next_number += 1;
-                bases.insert(*next_number, base);
-                let path = format!("{SOURCE}://{}/{}", *next_number, manifest.scene);
-                commands.spawn(Pending {
-                    address,
-                    number: *next_number,
-                    gltf: assets
-                        .load_builder()
-                        .with_settings(|s: &mut GltfLoaderSettings| s.load_cameras = false)
-                        .load(path),
-                    manifest,
-                    crossing: fetch.1,
-                });
+        let (base, manifest, tree) = match result {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                fail(&mut status, e);
+                continue;
             }
-            Err(e) => fail(&mut status, e.to_string()),
+        };
+        *next_number += 1;
+        bases.insert(*next_number, base);
+        let visit = Visit {
+            address,
+            number: *next_number,
+            manifest,
+            crossing: fetch.1,
+        };
+        let place_files = format!("{SOURCE}://{}/", *next_number);
+        if let Some(tree) = tree {
+            let root = commands
+                .spawn((
+                    Name::new(visit.manifest.name.clone()),
+                    UiRoot {
+                        tree,
+                        assets: place_files,
+                    },
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: px(HEIGHT),
+                        left: px(0),
+                        right: px(0),
+                        bottom: px(0),
+                        ..default()
+                    },
+                    // Under the address bar's status line.
+                    GlobalZIndex(-1),
+                ))
+                .id();
+            arrive(
+                &mut commands,
+                &mut status,
+                &mut arrived,
+                &bases,
+                root,
+                &visit,
+            );
+            continue;
         }
+        let scene = visit.manifest.scene.as_deref().unwrap_or_default();
+        commands.spawn(Pending {
+            gltf: assets
+                .load_builder()
+                .with_settings(|s: &mut GltfLoaderSettings| s.load_cameras = false)
+                .load(format!("{place_files}{scene}")),
+            visit,
+        });
     }
 }
 
@@ -164,10 +236,10 @@ fn finish_travel(
     assets: Res<AssetServer>,
     gltfs: Res<Assets<Gltf>>,
 ) {
-    for (entity, place) in &pending {
+    for (entity, Pending { visit, gltf }) in &pending {
         let failed = match (
-            assets.load_state(&place.gltf),
-            assets.recursive_dependency_load_state(&place.gltf),
+            assets.load_state(gltf),
+            assets.recursive_dependency_load_state(gltf),
         ) {
             (LoadState::Failed(e), _) => Some(e.to_string()),
             (_, RecursiveDependencyLoadState::Failed(e)) => Some(e.to_string()),
@@ -175,46 +247,66 @@ fn finish_travel(
             _ => continue,
         };
         let scene = gltfs
-            .get(&place.gltf)
+            .get(gltf)
             .and_then(|g| g.default_scene.clone().or(g.scenes.first().cloned()));
         let Some(scene) = scene.filter(|_| failed.is_none()) else {
             commands.entity(entity).despawn();
-            bases.remove(place.number);
+            bases.remove(visit.number);
             fail(
                 &mut status,
                 failed.unwrap_or_else(|| {
-                    place::Text::scene_without_scene.fill(&[("scene", &place.manifest.scene)])
+                    let path = visit.manifest.scene.as_deref().unwrap_or_default();
+                    place::Text::scene_without_scene.fill(&[("scene", &path)])
                 }),
             );
             continue;
         };
         commands.entity(entity).despawn();
-        if let Some(old) = status.current.take() {
-            commands.entity(old.root).despawn();
-            bases.remove(old.number);
-        }
         let root = commands
             .spawn((
-                Name::new(place.manifest.name.clone()),
+                Name::new(visit.manifest.name.clone()),
                 Transform::default(),
                 Visibility::default(),
             ))
             .with_child(WorldAssetRoot(scene))
             .id();
-        status.current = Some(Current {
-            address: place.address.clone(),
-            manifest: place.manifest.clone(),
-            number: place.number,
+        arrive(
+            &mut commands,
+            &mut status,
+            &mut arrived,
+            &bases,
             root,
-        });
-        info!("arrived at {}", place.address);
-        status.loading = None;
-        arrived.write(Arrived {
-            root,
-            manifest: place.manifest.clone(),
-            crossing: place.crossing,
-        });
+            visit,
+        );
     }
+}
+
+/// Swaps the current Place for the visit, whose root is already spawned.
+fn arrive(
+    commands: &mut Commands,
+    status: &mut Status,
+    arrived: &mut MessageWriter<Arrived>,
+    bases: &Bases,
+    root: Entity,
+    visit: &Visit,
+) {
+    if let Some(old) = status.current.take() {
+        commands.entity(old.root).despawn();
+        bases.remove(old.number);
+    }
+    status.current = Some(Current {
+        address: visit.address.clone(),
+        manifest: visit.manifest.clone(),
+        number: visit.number,
+        root,
+    });
+    info!("arrived at {}", visit.address);
+    status.loading = None;
+    arrived.write(Arrived {
+        root,
+        manifest: visit.manifest.clone(),
+        crossing: visit.crossing,
+    });
 }
 
 fn fail(status: &mut Status, reason: String) {
@@ -264,7 +356,7 @@ pub(crate) mod tests {
                 .disable::<bevy::gilrs::GilrsPlugin>()
                 .disable::<bevy::log::LogPlugin>(),
         )
-        .add_plugins((PlacesPlugin, crate::sky::SkyPlugin));
+        .add_plugins((PlacesPlugin, crate::sky::SkyPlugin, ui::UiPlugin));
         setup(&mut app);
         app.finish();
         app.cleanup();
@@ -323,9 +415,75 @@ pub(crate) mod tests {
         }
     }
 
+    fn count<C: Component>(app: &mut App) -> usize {
+        app.world_mut().query::<&C>().iter(app.world()).count()
+    }
+
+    #[test]
+    fn travel_between_scene_and_ui_places_leaves_only_the_new_one() {
+        let mut app = app();
+        travel(&mut app, &example("ui-test"));
+        assert_eq!(app.world().resource::<Status>().error, None);
+        assert_eq!(
+            (count::<UiRoot>(&mut app), count::<WorldAssetRoot>(&mut app)),
+            (1, 0)
+        );
+        travel(&mut app, &example(""));
+        assert_eq!(
+            (count::<UiRoot>(&mut app), count::<WorldAssetRoot>(&mut app)),
+            (0, 1)
+        );
+        travel(&mut app, &example("ui-test"));
+        assert_eq!(
+            (count::<UiRoot>(&mut app), count::<WorldAssetRoot>(&mut app)),
+            (1, 0)
+        );
+    }
+
+    #[test]
+    fn a_link_travels_to_its_target_from_the_current_place() {
+        let mut app = app();
+        travel(&mut app, &example("ui-test"));
+        app.world_mut().write_message(FollowLink {
+            target: "../meadow".into(),
+        });
+        app.update();
+        let start = Instant::now();
+        while current(&app) != example("meadow") {
+            assert!(
+                start.elapsed() < Duration::from_secs(20),
+                "the link didn't travel"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+            app.update();
+        }
+    }
+
+    #[test]
+    fn a_missing_or_invalid_ui_fails_like_a_missing_scene() {
+        let manifest = "version = \"0.2.0\"\nname = \"A\"\nui = \"page.cml\"";
+        let failing = [
+            temp_place("missing-ui", &[("place.con", manifest)]),
+            temp_place(
+                "invalid-ui",
+                &[
+                    ("place.con", manifest),
+                    ("page.cml", "<Box colour=Accent/>"),
+                ],
+            ),
+        ];
+        let mut app = app();
+        travel(&mut app, &example(""));
+        for target in &failing {
+            travel(&mut app, target);
+            assert!(app.world().resource::<Status>().error.is_some(), "{target}");
+            assert_eq!(current(&app), example(""));
+        }
+    }
+
     #[test]
     fn a_failed_load_keeps_the_current_place() {
-        let manifest = "version = \"0.1.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
+        let manifest = "version = \"0.2.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
         let failing = [
             temp_place("missing-scene", &[("place.con", manifest)]),
             temp_place("invalid", &[("place.con", "name = 3")]),

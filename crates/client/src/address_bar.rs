@@ -18,7 +18,7 @@ impl Plugin for AddressBarPlugin {
     }
 }
 
-const HEIGHT: f32 = 36.0;
+pub const HEIGHT: f32 = 36.0;
 
 #[derive(Component)]
 struct Field;

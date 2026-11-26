@@ -1,0 +1,175 @@
+namespace ui
+
+enum Space {
+  Xs
+  S
+  M
+  L
+  Xl
+  Px(Float)
+}
+
+enum TextSize {
+  S
+  M
+  L
+  Xl
+  Px(Float)
+}
+
+enum Color {
+  Background
+  Surface
+  Foreground
+  Muted
+  Accent
+  Clear
+  Rgb(Int, Int, Int)
+}
+
+enum Length {
+  Auto
+  Fill
+  Px(Float)
+  Percent(Float)
+}
+
+enum Direction {
+  Row
+  Column
+}
+
+enum Align {
+  Start
+  Center
+  End
+  Stretch
+}
+
+enum Justify {
+  Start
+  Center
+  End
+  Between
+}
+
+interface Element {}
+
+class Box: Element {
+  let pressable: Bool = false
+  let focusable: Bool = false
+  let children: Element[] = []
+  let direction: Direction? = None
+  let gap: Space? = None
+  let padding: Space? = None
+  let margin: Space? = None
+  let width: Length? = None
+  let height: Length? = None
+  let align: Align? = None
+  let justify: Justify? = None
+  let background: Color? = None
+  let color: Color? = None
+  let font_size: TextSize? = None
+  let border: Space? = None
+  let border_color: Color? = None
+  let radius: Space? = None
+}
+
+class Button: Element {
+  let text: String = ""
+  let children: Element[] = []
+  let direction: Direction? = None
+  let gap: Space? = None
+  let padding: Space? = None
+  let margin: Space? = None
+  let width: Length? = None
+  let height: Length? = None
+  let align: Align? = None
+  let justify: Justify? = None
+  let background: Color? = None
+  let color: Color? = None
+  let font_size: TextSize? = None
+  let border: Space? = None
+  let border_color: Color? = None
+  let radius: Space? = None
+}
+
+class Text: Element {
+  let text: String = ""
+  let children: Element[] = []
+  let direction: Direction? = None
+  let gap: Space? = None
+  let padding: Space? = None
+  let margin: Space? = None
+  let width: Length? = None
+  let height: Length? = None
+  let align: Align? = None
+  let justify: Justify? = None
+  let background: Color? = None
+  let color: Color? = None
+  let font_size: TextSize? = None
+  let border: Space? = None
+  let border_color: Color? = None
+  let radius: Space? = None
+}
+
+class Span: Element {
+  let text: String
+  let color: Color? = None
+  let font_size: TextSize? = None
+}
+
+class Link: Element {
+  let target: String
+  let text: String
+  let direction: Direction? = None
+  let gap: Space? = None
+  let padding: Space? = None
+  let margin: Space? = None
+  let width: Length? = None
+  let height: Length? = None
+  let align: Align? = None
+  let justify: Justify? = None
+  let background: Color? = None
+  let color: Color? = None
+  let font_size: TextSize? = None
+  let border: Space? = None
+  let border_color: Color? = None
+  let radius: Space? = None
+}
+
+class TextInput: Element {
+  let value: String = ""
+  let direction: Direction? = None
+  let gap: Space? = None
+  let padding: Space? = None
+  let margin: Space? = None
+  let width: Length? = None
+  let height: Length? = None
+  let align: Align? = None
+  let justify: Justify? = None
+  let background: Color? = None
+  let color: Color? = None
+  let font_size: TextSize? = None
+  let border: Space? = None
+  let border_color: Color? = None
+  let radius: Space? = None
+}
+
+class Image: Element {
+  let src: String
+  let direction: Direction? = None
+  let gap: Space? = None
+  let padding: Space? = None
+  let margin: Space? = None
+  let width: Length? = None
+  let height: Length? = None
+  let align: Align? = None
+  let justify: Justify? = None
+  let background: Color? = None
+  let color: Color? = None
+  let font_size: TextSize? = None
+  let border: Space? = None
+  let border_color: Color? = None
+  let radius: Space? = None
+}

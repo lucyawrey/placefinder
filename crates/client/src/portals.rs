@@ -118,9 +118,13 @@ pub fn arrival(
     body_radius: f32,
 ) -> Pose {
     let Some(portal) = named(manifest, name) else {
+        let spawn = manifest
+            .spawn
+            .as_ref()
+            .expect("only Places with a scene, and so a spawn, are arrived in");
         return Pose {
-            feet: Vec3::from_array(manifest.spawn.center.map(|v| v as f32)),
-            yaw: (manifest.spawn.yaw as f32).to_radians(),
+            feet: Vec3::from_array(spawn.center.map(|v| v as f32)),
+            yaw: (spawn.yaw as f32).to_radians(),
             velocity: Vec3::ZERO,
         };
     };
@@ -356,11 +360,12 @@ mod tests {
         Manifest {
             version: manifest::VERSION.into(),
             name: "A".into(),
-            scene: "s.gltf".into(),
-            spawn: manifest::Spawn {
+            scene: Some("s.gltf".into()),
+            spawn: Some(manifest::Spawn {
                 center: [0.0; 3],
                 yaw: 0.0,
-            },
+            }),
+            ui: None,
             portals: vec![gate],
             labels: vec![],
             capture_mouse: false,
@@ -409,10 +414,10 @@ mod tests {
     #[test]
     fn an_unknown_or_missing_name_arrives_at_the_spawn_facing_its_yaw() {
         let mut place = linked([0.0; 3], 0.0);
-        place.spawn = manifest::Spawn {
+        place.spawn = Some(manifest::Spawn {
             center: [1.0, 0.0, 2.0],
             yaw: 180.0,
-        };
+        });
         for name in [Some("other"), None] {
             let pose = arrival(&place, name, None, 0.3);
             assert_eq!(

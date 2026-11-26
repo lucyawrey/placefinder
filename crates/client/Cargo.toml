@@ -19,11 +19,12 @@ bevy = { version = "0.20.1", features = [
     "pbr_transmission_textures",
     "system_clipboard",
 ] }
-check-core = { git = "https://github.com/lucyawrey/check", rev = "b8be2a9" }
-check-serde = { git = "https://github.com/lucyawrey/check", rev = "b8be2a9" }
+check-core = { git = "https://github.com/lucyawrey/check", rev = "6894432" }
+check-serde = { git = "https://github.com/lucyawrey/check", rev = "6894432" }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 motor = { version = "0.1.0", path = "../motor" }
 place = { version = "0.1.0", path = "../place" }
+ui = { version = "0.1.0", path = "../ui" }
 rmcp = { version = "3.11.0", features = ["transport-streamable-http-server"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.54.1", features = ["rt", "net", "sync", "time"] }

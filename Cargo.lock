@@ -2261,7 +2261,7 @@ dependencies = [
 [[package]]
 name = "check-core"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedcfb2e854379e6cff1bb49c"
+source = "git+https://github.com/lucyawrey/check?rev=6894432#6894432d529c2bac2e798798b4423fa1dbc2ff29"
 dependencies = [
  "check-runtime",
  "check-syntax",
@@ -2273,12 +2273,12 @@ dependencies = [
 [[package]]
 name = "check-runtime"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedcfb2e854379e6cff1bb49c"
+source = "git+https://github.com/lucyawrey/check?rev=6894432#6894432d529c2bac2e798798b4423fa1dbc2ff29"
 
 [[package]]
 name = "check-serde"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedcfb2e854379e6cff1bb49c"
+source = "git+https://github.com/lucyawrey/check?rev=6894432#6894432d529c2bac2e798798b4423fa1dbc2ff29"
 dependencies = [
  "check-core",
  "check-syntax",
@@ -2289,7 +2289,7 @@ dependencies = [
 [[package]]
 name = "check-syntax"
 version = "0.1.0"
-source = "git+https://github.com/lucyawrey/check?rev=b8be2a9#b8be2a9d7ef406eeedcfb2e854379e6cff1bb49c"
+source = "git+https://github.com/lucyawrey/check?rev=6894432#6894432d529c2bac2e798798b4423fa1dbc2ff29"
 
 [[package]]
 name = "chrono"
@@ -2318,6 +2318,7 @@ dependencies = [
  "rmcp",
  "serde",
  "tokio",
+ "ui",
  "winresource",
 ]
 
@@ -6314,6 +6315,17 @@ name = "typewit"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214ca0b2191785cbc06209b9ca1861e048e39b5ba33574b3cedd58363d5bb5f6"
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+dependencies = [
+ "accesskit",
+ "bevy",
+ "check-core",
+ "check-serde",
+ "serde",
+]
 
 [[package]]
 name = "unicode-general-category"

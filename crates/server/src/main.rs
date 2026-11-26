@@ -131,7 +131,7 @@ mod tests {
 
     #[tokio::test]
     async fn loads_a_json_place_over_http_and_reports_a_missing_place_con() {
-        let manifest = br#"{"version": "0.1.0", "name": "A", "scene": "s.gltf", "spawn": {"center": [0, 0, 0]}}"#;
+        let manifest = br#"{"version": "0.2.0", "name": "A", "scene": "s.gltf", "spawn": {"center": [0, 0, 0]}}"#;
         let root = temp_root("json", &[("a/place.json", manifest), ("b/x.txt", b"")]);
         let (_, manifest) = load_served(root.clone(), "a").await.unwrap();
         assert_eq!(manifest.name, "A");
@@ -143,12 +143,13 @@ mod tests {
 
     #[tokio::test]
     async fn a_missing_scene_over_http_is_not_found() {
-        let manifest = b"version = \"0.1.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
+        let manifest = b"version = \"0.2.0\"\nname = \"A\"\nscene = \"s.gltf\"\nspawn = (center = (0.0, 0.0, 0.0))";
         let root = temp_root("no-scene", &[("a/place.con", manifest)]);
         let (base, manifest) = load_served(root, "a").await.unwrap();
-        let result = tokio::task::spawn_blocking(move || base.fetch(&manifest.scene))
-            .await
-            .unwrap();
+        let result =
+            tokio::task::spawn_blocking(move || base.fetch(manifest.scene.as_deref().unwrap()))
+                .await
+                .unwrap();
         assert!(matches!(result, Err(FetchError::NotFound(_))));
     }
 

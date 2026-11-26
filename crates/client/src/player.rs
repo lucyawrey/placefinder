@@ -95,7 +95,8 @@ fn spawn(mut commands: Commands) {
 }
 
 /// Arrives through the Portal the address's fragment names, else at the spawn. Only turns the
-/// player about the vertical axis and keeps their pitch, as VR must.
+/// player about the vertical axis and keeps their pitch, as VR must. A UI-only Place has no
+/// spawn, and the player waits without a collision world.
 fn place_on_arrival(
     mut arrived: MessageReader<Arrived>,
     status: Res<Status>,
@@ -109,8 +110,12 @@ fn place_on_arrival(
     let Some(arrived) = arrived.read().last() else {
         return;
     };
+    *collision = Collision::None;
+    let Some(spawn) = &arrived.manifest.spawn else {
+        return;
+    };
     sky::show(&mut commands.entity(*eye), arrived.manifest.sky, &gradient);
-    let spawn_feet = Vec3::from_array(arrived.manifest.spawn.center.map(|v| v as f32));
+    let spawn_feet = Vec3::from_array(spawn.center.map(|v| v as f32));
     let fragment = status.current.as_ref().and_then(|c| c.address.fragment());
     let pose = portals::arrival(
         &arrived.manifest,
@@ -128,7 +133,6 @@ fn place_on_arrival(
         ..State::at(spawn_feet)
     };
     player.previous = pose.feet;
-    *collision = Collision::None;
 }
 
 /// Lights a scene that brings no lights of its own with a sun, which leaves with the Place.

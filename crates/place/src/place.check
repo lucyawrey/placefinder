@@ -23,8 +23,9 @@ class Label(text: String, center: (Float, Float, Float), yaw: Float = 0.0, heigh
 class Place {
   let version: String
   let name: String
-  let scene: String
-  let spawn: Spawn
+  let scene: String? = None
+  let spawn: Spawn? = None
+  let ui: String? = None
   let portals: Portal[] = []
   let labels: Label[] = []
   let capture_mouse: Bool = false
